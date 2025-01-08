@@ -1,4 +1,8 @@
-# DTU RAVEN's Python Code Template
+# DTU RAVEN's Computer Vision repository
+
+## Info
+
+This repository contains the scripts needed for object detection on DTU RAVEN's drone, designated for competing in SUAS 2025. The modules use ROS2 for communication sharing information between them.
 
 ## Setup
 
