@@ -12,4 +12,4 @@ before_script:
 
 test:
   script:
-    - ./software/scripts/run_mypy_on_src.sh software/src 
+    - ./software/scripts/run_mypy_on_src.sh software/src
