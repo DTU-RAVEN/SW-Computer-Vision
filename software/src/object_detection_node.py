@@ -1,13 +1,14 @@
+import json
+
+import cv2
+import torch
+from ultralytics import YOLO
+
 import rclpy                        # type: ignore
 from rclpy.node import Node         # type: ignore
 from sensor_msgs.msg import Image   # type: ignore
 from std_msgs.msg import String     # type: ignore
 from cv_bridge import CvBridge      # type: ignore
-
-import cv2
-import torch
-from ultralytics import YOLO
-import json
 
 # ---------------------------
 # HYPERPARAMETERS
@@ -80,6 +81,9 @@ class ObjectDetectionNode(Node):
 
         ## CvBridge for image conversion
         self.bridge = CvBridge()
+
+        ## Keep next track id
+        self.next_track_id = 0
 
         ## Device to do matrix multiplications
         self.device = None
@@ -242,13 +246,14 @@ class ObjectDetectionNode(Node):
         Generate a new unique track ID.
         """
         if not hasattr(self, 'next_track_id'):
-            ##  Find next track id
             self.next_track_id = 0
         track_id = self.next_track_id
         self.next_track_id += 1
         return track_id
 
-def main(args: list[str] = []) -> None:
+def main(args: list[str] = None) -> None:
+    """ @brief Main function    
+    """
     rclpy.init(args=args)
     node = ObjectDetectionNode()
     try:
