@@ -1,0 +1,42 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Setup Virtual Environment",
+            "type": "shell",
+            "command": "./software/scripts/setup.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run",
+            "type": "shell",
+            "command": "venv/bin/python3 software/src/application/main.py", //its like writing in console make //btw you can others commands like clean make build etc
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Freeze Requirements",
+            "type": "shell",
+            "command": "./software/scripts/freeze_requirements.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "MyPy src",
+            "type": "shell",
+            "command": "./software/scripts/run_mypy_on_src.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": ["software/src"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
