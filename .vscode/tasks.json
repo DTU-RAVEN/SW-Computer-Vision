@@ -47,6 +47,16 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "Generate Docs",
+            "type": "shell",
+            "command": "doxygen Doxyfile && google-chrome docs/html/index.html", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }
