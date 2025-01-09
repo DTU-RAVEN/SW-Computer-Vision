@@ -2,4 +2,4 @@
 
 source venv/bin/activate
 
-mypy --follow-imports=skip $1 --strict
+mypy --follow-imports=skip --strict --show-traceback $1

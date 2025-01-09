@@ -64,7 +64,7 @@ class CameraNode(Node):
             self.cap.release()
         super().destroy_node()
 
-def main(args=None):
+def main(args: list[str] = []):
     rclpy.init(args=args)
     camera_node = CameraNode()
     try:

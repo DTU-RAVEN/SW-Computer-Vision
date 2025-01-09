@@ -13,7 +13,7 @@
         {
             "label": "Run",
             "type": "shell",
-            "command": "venv/bin/python3 software/src/application/main.py", //its like writing in console make //btw you can others commands like clean make build etc
+            "command": "venv/bin/python3 software/src/main.py", //its like writing in console make //btw you can others commands like clean make build etc
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -32,6 +32,16 @@
             "label": "MyPy src",
             "type": "shell",
             "command": "./software/scripts/run_mypy_on_src.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": ["software/src"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Pylint src",
+            "type": "shell",
+            "command": "./software/scripts/run_pylint_on_dir.sh", //its like writing in console make //btw you can others commands like clean make build etc
             "args": ["software/src"],
             "group": {
                 "kind": "build",

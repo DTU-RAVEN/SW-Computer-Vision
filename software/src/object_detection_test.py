@@ -16,7 +16,7 @@ ALPHA = 0.7                 # Bounding box smoothing factor (0=no smoothing, 1=f
 
 # Define the set of COCO class IDs that approximate your desired categories
 TARGET_CLASS_IDS = {
-    0,   # person
+    0,   # person   
     2,   # car
     3,   # motorcycle
     4,   # airplane

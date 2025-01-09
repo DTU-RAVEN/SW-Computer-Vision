@@ -94,7 +94,7 @@ class VisualizationNode(Node):
         """
         cv2.waitKey(1)
 
-def main(args=None):
+def main(args: list[str] = []):
     rclpy.init(args=args)
     node = VisualizationNode()
 

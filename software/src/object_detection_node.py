@@ -1,8 +1,8 @@
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image
-from std_msgs.msg import String
-from cv_bridge import CvBridge
+import rclpy                        # type: ignore
+from rclpy.node import Node         # type: ignore
+from sensor_msgs.msg import Image   # type: ignore
+from std_msgs.msg import String     # type: ignore
+from cv_bridge import CvBridge      # type: ignore
 
 import cv2
 import torch
@@ -58,7 +58,7 @@ CUSTOM_LABELS = {
 }
 
 class ObjectDetectionNode(Node):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__('object_detection_node')
 
         # ---------------------------
@@ -102,7 +102,7 @@ class ObjectDetectionNode(Node):
         # ---------------------------
         # track_history keeps track of each object's last-known bbox and how many times it has been missed
         # Format: track_id -> {"bbox": (x1, y1, x2, y2), "conf": float, "label": str, "miss_count": int}
-        self.track_history = {}
+        self.track_history : dict[int, dict]
 
     def listener_callback(self, ros_image):
         """Callback that runs each time we receive an Image on /camera/image."""
@@ -212,7 +212,7 @@ class ObjectDetectionNode(Node):
         # Optional debug log
         self.get_logger().info(f"Published {len(results_to_publish)} detections at t={timestamp_ms} ms.")
 
-    def assign_track_id(self, x1, y1, x2, y2):
+    def assign_track_id(self, x1 : int, y1 : int, x2 : int, y2 : int) -> int:
         """
         Assign a unique track ID based on the bounding box position.
         This is a placeholder for a more robust tracking algorithm.
@@ -233,7 +233,7 @@ class ObjectDetectionNode(Node):
         # If no existing track is close, assign a new ID
         return self.get_new_track_id()
 
-    def get_new_track_id(self):
+    def get_new_track_id(self) -> int:
         """
         Generate a new unique track ID.
         """
@@ -243,7 +243,7 @@ class ObjectDetectionNode(Node):
         self.next_track_id += 1
         return track_id
 
-def main(args=None):
+def main(args: list[str] = []) -> None:
     rclpy.init(args=args)
     node = ObjectDetectionNode()
     try:
