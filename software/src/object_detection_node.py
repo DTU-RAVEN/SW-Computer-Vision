@@ -58,16 +58,19 @@ CUSTOM_LABELS = {
 }
 
 class ObjectDetectionNode(Node):
+    """ @brief Object detection node class
+    """
     def __init__(self) -> None:
+        """ @brief Object detection node constructor
+        """
         super().__init__('object_detection_node')
 
-        # ---------------------------
-        # ROS Sub/Pub Setup
-        # ---------------------------
-        # Subscribe to the /camera/image topic
+        ## Detection node subscription instance. Subscribing to /camera/image
         self.subscription = self.create_subscription(
             Image,
             '/camera/image',
+
+            ## Listener callback
             self.listener_callback,
             10
         )
@@ -75,13 +78,11 @@ class ObjectDetectionNode(Node):
         # Publisher for the detection results (JSON-encoded string on /vision/object_spotted)
         self.publisher_ = self.create_publisher(String, '/vision/object_spotted', 10)
 
-        # Initialize CvBridge for image conversion
+        ## CvBridge for image conversion
         self.bridge = CvBridge()
 
-        # ---------------------------
-        # YOLO & Torch Setup
-        # ---------------------------
-        # Pick device: 'mps' if available (Apple Silicon), else GPU, else CPU.
+        ## Device to do matrix multiplications
+        self.device = None
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
             self.get_logger().info("Using Apple MPS device.")
@@ -92,7 +93,7 @@ class ObjectDetectionNode(Node):
             self.device = torch.device("cpu")
             self.get_logger().info("Using CPU device.")
 
-        # Load YOLOv8 model (pretrained on COCO) to the chosen device
+        ## YOLOv8 model (pretrained on COCO) to the chosen device
         self.model = YOLO(model_name).to(self.device)
 
         self.get_logger().info("Object Detection Node started. Subscribed to /camera/image.")
@@ -105,7 +106,10 @@ class ObjectDetectionNode(Node):
         self.track_history : dict[int, dict]
 
     def listener_callback(self, ros_image):
-        """Callback that runs each time we receive an Image on /camera/image."""
+        """ @brief Callback that runs each time we receive an Image on /camera/image.
+            @ros_image The image
+        """
+
         # Convert ROS Image to OpenCV format (BGR)
         try:
             frame = self.bridge.imgmsg_to_cv2(ros_image, desired_encoding='bgr8')
@@ -238,6 +242,7 @@ class ObjectDetectionNode(Node):
         Generate a new unique track ID.
         """
         if not hasattr(self, 'next_track_id'):
+            ##  Find next track id
             self.next_track_id = 0
         track_id = self.next_track_id
         self.next_track_id += 1

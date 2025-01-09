@@ -11,13 +11,19 @@ import cv2
 import json
 
 class VisualizationNode(Node):
+    """ @brief Visualization node class
+    """
     def __init__(self):
+        """ @brief Visualization Node constructor
+        """
         super().__init__('visualization_node')
 
-        # Subscribe to raw camera feed
+        ## Subscribe to raw camera feed
         self.subscription_image = self.create_subscription(
             Image,
             '/camera/image',
+
+            ## Camera callback
             self.camera_callback,
             10
         )
@@ -26,14 +32,19 @@ class VisualizationNode(Node):
         self.subscription_detections = self.create_subscription(
             String,
             '/vision/object_spotted',
+
+            ## Detection callback
             self.detections_callback,
             10
         )
 
+        ## CvBridge instance
         self.bridge = CvBridge()
-        self.current_detections = []  # Will hold bounding boxes from last detection message
 
-        # Create a small timer to periodically allow OpenCV to process GUI events
+        ## Will hold bounding boxes from last detection message
+        self.current_detections = []
+
+        ## Create a small timer to periodically allow OpenCV to process GUI events
         self.timer = self.create_timer(0.05, self.opencv_gui_loop)
 
     def camera_callback(self, msg):

@@ -9,18 +9,25 @@ USE_MP4_FILE = True  # Set to True to use run.mp4, False for live camera
 video_path = "videos/football.mp4"
 
 class CameraNode(Node):
+    """ @brief Camera node class
+    """
     def __init__(self):
+        """ @brief Camera Node constructor function
+        """
         super().__init__('camera_node')
 
-        # Create a publisher that publishes sensor_msgs/Image on the /camera/image topic.
+        ## A publisher to publish on topic /camera/image
         self.publisher_ = self.create_publisher(Image, '/camera/image', 10)
 
         # Create a timer to periodically read frames from the camera/video.
         timer_period = 0.1  # seconds (10 Hz frame rate)
+
+        ## Camera node timer
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
         # Depending on the toggle, open the appropriate video source.
         if USE_MP4_FILE:
+            ## Video capture instance
             self.cap = cv2.VideoCapture(video_path)
             if not self.cap.isOpened():
                 self.get_logger().error("Could not open video file run.mp4.")
@@ -31,11 +38,13 @@ class CameraNode(Node):
             if not self.cap.isOpened():
                 self.get_logger().error("Could not open camera.")
 
-        # Initialize CvBridge
+        ## CvBridge instance
         self.bridge = CvBridge()
         self.get_logger().info("Camera node started, publishing to /camera/image...")
 
     def timer_callback(self):
+        """ @brief Camera node timer callback
+        """
         ret, frame = self.cap.read()
 
         # If using MP4 and we reach end-of-file, loop back.
@@ -59,6 +68,8 @@ class CameraNode(Node):
         self.publisher_.publish(ros_image)
 
     def destroy_node(self):
+        """ @brief Destroy this node
+        """
         # Release the video/camera resource before shutting down
         if self.cap.isOpened():
             self.cap.release()
