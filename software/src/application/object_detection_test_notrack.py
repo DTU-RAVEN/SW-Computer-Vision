@@ -2,16 +2,15 @@ import cv2
 import torch
 from ultralytics import YOLO
 
-video_path = "videos/basketball.mp4"
-# video_path = "videos/football.mp4"
-# video_path = "videos/traffic.mp4"
+# video_path = "software/src/application/videos/basketball.mp4"
+video_path = "software/src/application/videos/football.mp4"
+# video_path = "software/src/application/videos/traffic.mp4"
 
 # HYPERPARAMETERS
-model_name = "yolov8l.pt"
+model_name = "yolov8s.pt"
 conf_threshold = 0.1       # Lower confidence threshold to increase recall
 iou_threshold = 0.50       # Slightly higher IoU threshold to help with tighter boxes
 MAX_FRAMES = 200
-# MAX_MISSES is no longer used without tracking
 ALPHA = 0.7                 # (Unused without tracking)
 
 # Define the set of COCO class IDs that approximate your desired categories
@@ -72,14 +71,24 @@ def draw_detections(frame, detections):
     return annotated_frame
 
 def main():
-    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    # Load YOLOv8 model
-    model = YOLO(model_name).to(device)
+    # Load YOLOv8 model without explicitly moving it to device
+    model = YOLO(model_name)
+    print(f"Model loaded: {model}")
 
-    # Use YOLOv8's prediction API
-    results = model(source=video_path, device=device, conf=conf_threshold, iou=iou_threshold, stream=True)
+    if model is None:
+        print("Failed to load model. Check the model path or file integrity.")
+        return
+
+    # Use YOLOv8's prediction API, specifying device during prediction
+    results = model.predict(source=video_path, device=device, conf=conf_threshold, iou=iou_threshold, stream=True)
 
     all_frames = []
     all_detections = []
@@ -91,7 +100,6 @@ def main():
             break
 
         frame = result.orig_img  # original frame
-        # Current frame's detections, after filtering
         frame_detections = []
 
         if result.boxes is not None and len(result.boxes) > 0:
