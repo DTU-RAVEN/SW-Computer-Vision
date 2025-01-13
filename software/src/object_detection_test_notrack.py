@@ -6,6 +6,7 @@ from ultralytics import YOLO
 video_path = "software/src/application/videos/football.mp4"
 # video_path = "software/src/application/videos/traffic.mp4"
 video_path = '/Users/fredmac/Documents/DTU-FredMac/archive/Berghouse Leopard Jog.mp4'
+video_path = '/Users/fredmac/Documents/DTU-FredMac/archive/DJI_0574.MP4' # bicycle riding
 
 # HYPERPARAMETERS
 model_name = "yolov8s.pt"
