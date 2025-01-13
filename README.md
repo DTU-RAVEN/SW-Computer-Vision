@@ -2,7 +2,7 @@
 
 ## Info
 
-This repository contains the scripts needed for object detection on DTU RAVEN's drone, designated for competing in SUAS 2025. The modules use ROS2 for communication sharing information between them.
+This repository contains the scripts needed for object detection on DTU RAVEN's drone, designated for competing in SUAS 2025. The modules use ROS2 for information sharing between them.
 
 ## Setup
 
