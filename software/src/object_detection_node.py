@@ -1,28 +1,29 @@
 import json
-
 import cv2
 import torch
-from ultralytics import YOLO
+# ---------------- NEW IMPORT ----------------
+from object_detection_shared import initialize_model, parse_detection_result
+# --------------------------------------------
+# from ultralytics import YOLO  # Now handled by the helper script
 
-import rclpy                        # type: ignore
-from rclpy.node import Node         # type: ignore
-from sensor_msgs.msg import Image   # type: ignore
-from std_msgs.msg import String     # type: ignore
-from cv_bridge import CvBridge      # type: ignore
+import rclpy                        
+from rclpy.node import Node        
+from sensor_msgs.msg import Image  
+from std_msgs.msg import String    
+from cv_bridge import CvBridge     
 
 # ---------------------------
 # HYPERPARAMETERS
 # ---------------------------
 model_name = "yolov8l.pt"
-conf_threshold = 0.01       # Lower confidence threshold to increase recall
-iou_threshold = 0.50        # Slightly higher IoU threshold to help with tighter boxes
-MAX_FRAMES = 200            # Not used in ROS node but kept for consistency
-MAX_MISSES = 5              # How many frames to persist an object if it temporarily disappears
-ALPHA = 0.7                 # Bounding box smoothing factor (0=no smoothing, 1=full smoothing)
+conf_threshold = 0.01
+iou_threshold = 0.50
+MAX_FRAMES = 200   
+MAX_MISSES = 5
+ALPHA = 0.7
 
-# Define the set of COCO class IDs that approximate the desired categories
 TARGET_CLASS_IDS = {
-    0,   # person (for person/mannequin)
+    0,   # person 
     2,   # car
     3,   # motorcycle
     4,   # airplane
@@ -36,10 +37,9 @@ TARGET_CLASS_IDS = {
     32,  # sports ball
     34,  # baseball bat
     38,  # tennis racket
-    59,  # bed (for mattress)
+    59,  # bed
 }
 
-# Optionally, define a custom label dictionary if you want user-friendly names.
 CUSTOM_LABELS = {
     0:  "Person / Mannequin",
     2:  "Car (>1:8 Scale Model)",
@@ -66,27 +66,19 @@ class ObjectDetectionNode(Node):
         """
         super().__init__('object_detection_node')
 
-        ## Detection node subscription instance. Subscribing to /camera/image
         self.subscription = self.create_subscription(
             Image,
             '/camera/image',
-
-            ## Listener callback
             self.listener_callback,
             10
         )
-
-        # Publisher for the detection results (JSON-encoded string on /vision/object_spotted)
         self.publisher_ = self.create_publisher(String, '/vision/object_spotted', 10)
-
-        ## CvBridge for image conversion
         self.bridge = CvBridge()
 
         ## Keep next track id
         self.next_track_id = 0
 
-        ## Device to do matrix multiplications
-        self.device = None
+        # Decide on device
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
             self.get_logger().info("Using Apple MPS device.")
@@ -97,114 +89,94 @@ class ObjectDetectionNode(Node):
             self.device = torch.device("cpu")
             self.get_logger().info("Using CPU device.")
 
-        ## YOLOv8 model (pretrained on COCO) to the chosen device
-        self.model = YOLO(model_name).to(self.device)
+        # -------------- IMPORTANT CHANGE: Use our helper to load the YOLO model --------------
+        self.model = initialize_model(model_name, self.device)
 
         self.get_logger().info("Object Detection Node started. Subscribed to /camera/image.")
 
-        # ---------------------------
-        # Tracking Setup
-        # ---------------------------
-        # track_history keeps track of each object's last-known bbox and how many times it has been missed
-        # Format: track_id -> {"bbox": (x1, y1, x2, y2), "conf": float, "label": str, "miss_count": int}
-        self.track_history : dict[int, dict]
+        # For tracking
+        self.track_history = {}
 
     def listener_callback(self, ros_image):
-        """ @brief Callback that runs each time we receive an Image on /camera/image.
-            @ros_image The image
+        """ @brief Callback for each incoming image message
         """
-
-        # Convert ROS Image to OpenCV format (BGR)
+        # Convert ROS Image to OpenCV (BGR)
         try:
             frame = self.bridge.imgmsg_to_cv2(ros_image, desired_encoding='bgr8')
         except Exception as e:
             self.get_logger().error(f"Failed to convert ROS Image to OpenCV image: {e}")
             return
 
-        # Retrieve the timestamp (from the image header).
-        # Convert ROS2 time to float in seconds or to an int in milliseconds.
         stamp = ros_image.header.stamp.sec + ros_image.header.stamp.nanosec * 1e-9
-        timestamp_ms = int(stamp * 1000)  # example in milliseconds
+        timestamp_ms = int(stamp * 1000)
 
-        # --------------------------------------------------------
-        # Perform object detection using your YOLO approach
-        # --------------------------------------------------------
-        # Convert BGR -> RGB as YOLOv8 expects RGB images
+        # Convert BGR -> RGB for YOLO
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Run detection with confidence and IOU thresholds
+        # Run detection
         results = self.model.predict(
-            rgb_frame, 
-            device=self.device, 
-            conf=conf_threshold, 
-            iou=iou_threshold, 
+            rgb_frame,
+            device=self.device,
+            conf=conf_threshold,
+            iou=iou_threshold,
             verbose=False
         )
-        boxes = results[0].boxes
+        
+        # ---------------------------------------------
+        # IMPORTANT CHANGE: Use parse_detection_result
+        # ---------------------------------------------
+        # results[0] is the YOLO result for this single frame
+        raw_detections = parse_detection_result(
+            results[0], TARGET_CLASS_IDS, CUSTOM_LABELS, self.model
+        )
+        # raw_detections is a list of (class_id, conf, x1, y1, x2, y2, display_label).
 
-        # Current frame's detections after filtering and tracking
+        # Tracking logic
         current_detections = []
 
-        if boxes is not None and len(boxes) > 0:
-            for box in boxes:
-                class_id = int(box.cls[0])
-                if class_id not in TARGET_CLASS_IDS:
-                    continue
+        for (class_id, conf, x1, y1, x2, y2, display_label) in raw_detections:
+            # Assign track ID (simple or more advanced)
+            track_id = self.assign_track_id(x1, y1, x2, y2)
 
-                conf = float(box.conf[0])
-                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                # Here, since we're not using an external tracker, assign a temporary track_id
-                # You might want to implement a better tracking mechanism (e.g., SORT, Deep SORT)
-                track_id = self.assign_track_id(x1, y1, x2, y2)
+            # Smoothing if existing track
+            if track_id in self.track_history:
+                old_x1, old_y1, old_x2, old_y2 = self.track_history[track_id]["bbox"]
+                x1 = int(ALPHA * x1 + (1 - ALPHA) * old_x1)
+                y1 = int(ALPHA * y1 + (1 - ALPHA) * old_y1)
+                x2 = int(ALPHA * x2 + (1 - ALPHA) * old_x2)
+                y2 = int(ALPHA * y2 + (1 - ALPHA) * old_y2)
 
-                default_label = self.model.names.get(class_id, f"class_{class_id}")
-                display_label = CUSTOM_LABELS.get(class_id, default_label)
+            self.track_history[track_id] = {
+                "bbox": (x1, y1, x2, y2),
+                "conf": conf,
+                "label": display_label,
+                "miss_count": 0
+            }
 
-                # Check if we've seen this track_id before for smoothing
-                if track_id in self.track_history:
-                    old_x1, old_y1, old_x2, old_y2 = self.track_history[track_id]["bbox"]
-                    # Simple bounding box smoothing
-                    x1 = int(ALPHA * x1 + (1 - ALPHA) * old_x1)
-                    y1 = int(ALPHA * y1 + (1 - ALPHA) * old_y1)
-                    x2 = int(ALPHA * x2 + (1 - ALPHA) * old_x2)
-                    y2 = int(ALPHA * y2 + (1 - ALPHA) * old_y2)
+            current_detections.append(track_id)
 
-                # Update track_history for this track_id
-                self.track_history[track_id] = {
-                    "bbox": (x1, y1, x2, y2),
-                    "conf": conf,
-                    "label": display_label,
-                    "miss_count": 0  # reset because it's detected this frame
-                }
-
-                current_detections.append(track_id)
-
-        # Increase miss_count for those not detected in this frame
+        # Increase miss_count for undetected in this frame
         for t_id in list(self.track_history.keys()):
             if t_id not in current_detections:
                 self.track_history[t_id]["miss_count"] += 1
-                # If an object is missing, keep it up to MAX_MISSES frames
                 if self.track_history[t_id]["miss_count"] > MAX_MISSES:
-                    del self.track_history[t_id]  # remove from history
+                    del self.track_history[t_id]
 
-        # Build a list of final bounding boxes to publish (both newly seen and persisted)
+        # Prepare JSON results
         results_to_publish = []
         for t_id, info in self.track_history.items():
-            x1, y1, x2, y2 = info["bbox"]
-            conf = info["conf"]
-            label = info["label"]
-
-            # Only include if not exceeded miss count
             if info["miss_count"] <= MAX_MISSES:
-                # Calculate center, width, and height
+                x1, y1, x2, y2 = info["bbox"]
+                conf = info["conf"]
+                label = info["label"]
+
                 cx = (x1 + x2) // 2
                 cy = (y1 + y2) // 2
                 width = x2 - x1
                 height = y2 - y1
 
-                # Construct a detection dictionary consistent with your specs
                 detection_dict = {
-                    "object_id": t_id,               # Unique track ID
+                    "object_id": t_id,
                     "position": [cx, cy, width, height],
                     "label": label,
                     "confidence": conf,
@@ -212,20 +184,16 @@ class ObjectDetectionNode(Node):
                 }
                 results_to_publish.append(detection_dict)
 
-        # Publish the entire list of detections as a JSON string
         msg = String()
         msg.data = json.dumps({"detections": results_to_publish})
         self.publisher_.publish(msg)
-
-        # Optional debug log
         self.get_logger().info(f"Published {len(results_to_publish)} detections at t={timestamp_ms} ms.")
 
-    def assign_track_id(self, x1 : int, y1 : int, x2 : int, y2 : int) -> int:
+    def assign_track_id(self, x1: int, y1: int, x2: int, y2: int) -> int:
         """
-        Assign a unique track ID based on the bounding box position.
-        This is a placeholder for a more robust tracking algorithm.
+        Assign a unique track ID based on bounding box position.
+        This is a placeholder for a more robust tracker like SORT/DeepSORT.
         """
-        # Simple centroid-based assignment
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
 
@@ -238,7 +206,6 @@ class ObjectDetectionNode(Node):
             if distance < max(x2 - x1, y2 - y1) * 0.5:
                 return t_id
 
-        # If no existing track is close, assign a new ID
         return self.get_new_track_id()
 
     def get_new_track_id(self) -> int:
@@ -251,9 +218,7 @@ class ObjectDetectionNode(Node):
         self.next_track_id += 1
         return track_id
 
-def main(args: list[str] = None) -> None:
-    """ @brief Main function    
-    """
+def main(args=None) -> None:
     rclpy.init(args=args)
     node = ObjectDetectionNode()
     try:

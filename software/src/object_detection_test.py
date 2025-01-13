@@ -1,22 +1,26 @@
 import cv2
 import torch
-from ultralytics import YOLO
+# ---------------- NEW IMPORT ----------------
+from object_detection_shared import initialize_model, parse_detection_result
+# --------------------------------------------
+# from ultralytics import YOLO  # <-- Now handled by object_detection_shared
 
-# video_path = "videos/basketball.mp4"
-video_path = "videos/football.mp4"
-# video_path = "videos/traffic.mp4"
+# video_path = "software/src/application/videos/basketball.mp4"
+video_path = "software/src/application/videos/football.mp4"
+# video_path = "software/src/application/videos/traffic.mp4"
+video_path = '/Users/fredmac/Documents/DTU-FredMac/archive/Berghouse Leopard Jog.mp4'
+video_path = '/Users/fredmac/Documents/DTU-FredMac/archive/DJI_0574.MP4' # bicycle riding
 
 # HYPERPARAMETERS
-model_name = "yolov8l.pt"
+model_name = "yolov8s.pt"
 conf_threshold = 0.1       # Lower confidence threshold to increase recall
-iou_threshold = 0.50        # Slightly higher IoU threshold to help with tighter boxes
+iou_threshold = 0.50       # Slightly higher IoU threshold to help with tighter boxes
 MAX_FRAMES = 200
-MAX_MISSES = 5              # How many frames to persist an object if it temporarily disappears
-ALPHA = 0.7                 # Bounding box smoothing factor (0=no smoothing, 1=full smoothing)
+ALPHA = 0.7                 # (Unused without tracking)
 
 # Define the set of COCO class IDs that approximate your desired categories
 TARGET_CLASS_IDS = {
-    0,   # person   
+    0,   # person
     2,   # car
     3,   # motorcycle
     4,   # airplane
@@ -53,13 +57,13 @@ CUSTOM_LABELS = {
 
 def draw_detections(frame, detections):
     """
-    Draw bounding boxes and labels on a copy of the frame based on filtered detections.
-    detections: list of tuples (x1, y1, x2, y2, class_name, conf, track_id)
+    Draw bounding boxes and labels on a copy of the frame based on detections.
+    detections: list of tuples (x1, y1, x2, y2, class_name, conf)
     """
     annotated_frame = frame.copy()
-    for (x1, y1, x2, y2, class_name, conf, track_id) in detections:
+    for (x1, y1, x2, y2, class_name, conf) in detections:
         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        label = f"ID {track_id}: {class_name} {conf:.2f}"
+        label = f"{class_name} {conf:.2f}"
         cv2.putText(
             annotated_frame,
             label,
@@ -72,96 +76,55 @@ def draw_detections(frame, detections):
     return annotated_frame
 
 def main():
-    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+    print("Starting object detection test...")
+
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
     print(f"Using device: {device}")
 
-    # Load YOLOv8 model
-    model = YOLO(model_name).to(device)
+    # -------------- IMPORTANT CHANGE: Use our helper to load the model --------------
+    model = initialize_model(model_name, device)
+    print(f"Model loaded: {model}")
 
-    # Use YOLOv8's tracking API with ByteTrack
-    tracking_results = model.track(
-        source=video_path,
-        device=device,
-        conf=conf_threshold,
-        iou=iou_threshold,
-        tracker="config/bytetrack.yaml",  # reference to the local ByteTrack config file
-        stream=True,
-        show=False
+    if model is None:
+        print("Failed to load model. Check the model path or file integrity.")
+        return
+
+    # Use YOLOv8's prediction API, specifying device and stream=True for video
+    results = model.predict(
+        source=video_path, 
+        device=device, 
+        conf=conf_threshold, 
+        iou=iou_threshold, 
+        stream=True
     )
-
 
     all_frames = []
     all_detections = []
     frame_count = 0
 
-    # track_history keeps track of each object's last-known bbox and how many times it has been missed
-    # Format: track_id -> {"bbox": (x1, y1, x2, y2), "conf": float, "label": str, "miss_count": int}
-    track_history = {}
-
-    for result in tracking_results:
+    for result in results:
+        print(f"Processing frame {frame_count}...")
         frame_count += 1
         if frame_count > MAX_FRAMES:
             break
 
         frame = result.orig_img  # original frame
-        frame_h, frame_w = frame.shape[:2]
 
-        # Current frame's detections, after filtering
-        current_detections = []
-
-        # If we get no detections, we just increment miss_count for all in track_history
-        if result.boxes is not None and len(result.boxes) > 0:
-            for box in result.boxes:
-                class_id = int(box.cls[0])
-                if class_id not in TARGET_CLASS_IDS:
-                    continue
-
-                conf = float(box.conf[0])
-                x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                track_id = int(box.id[0]) if box.id is not None else -1
-
-                default_label = model.names.get(class_id, f"class_{class_id}")
-                display_label = CUSTOM_LABELS.get(class_id, default_label)
-
-                # Check if we've seen this track_id before
-                if track_id in track_history:
-                    # Get the old bounding box for smoothing
-                    old_x1, old_y1, old_x2, old_y2 = track_history[track_id]["bbox"]
-                    # Simple bounding box smoothing
-                    x1 = int(ALPHA * x1 + (1 - ALPHA) * old_x1)
-                    y1 = int(ALPHA * y1 + (1 - ALPHA) * old_y1)
-                    x2 = int(ALPHA * x2 + (1 - ALPHA) * old_x2)
-                    y2 = int(ALPHA * y2 + (1 - ALPHA) * old_y2)
-
-                # Update track_history for this track_id
-                track_history[track_id] = {
-                    "bbox": (x1, y1, x2, y2),
-                    "conf": conf,
-                    "label": display_label,
-                    "miss_count": 0  # reset because it's detected this frame
-                }
-
-                current_detections.append(track_id)
-
-        # Increase miss_count for those not detected in this frame
-        for t_id in list(track_history.keys()):
-            if t_id not in current_detections:
-                track_history[t_id]["miss_count"] += 1
-                # If an object is missing, keep it up to MAX_MISSES frames
-                if track_history[t_id]["miss_count"] > MAX_MISSES:
-                    del track_history[t_id]  # remove from history
-       
-        # Build a list of final bounding boxes to draw (both newly seen and persisted)
-        frame_detections = []
-        for t_id, info in track_history.items():
-            x1, y1, x2, y2 = info["bbox"]
-            conf = info["conf"]
-            label = info["label"]
-
-            # We only want to draw if the object was either detected this frame
-            # or has not exceeded MAX_MISSES.
-            if info["miss_count"] <= MAX_MISSES:
-                frame_detections.append((x1, y1, x2, y2, label, conf, t_id))
+        # -------------- IMPORTANT CHANGE: Use our parse_detection_result helper --------------
+        raw_detections = parse_detection_result(
+            result, TARGET_CLASS_IDS, CUSTOM_LABELS, model
+        )
+        # Now we have a list of tuples: (class_id, conf, x1, y1, x2, y2, label).
+        # Script 1 wants them in the form (x1, y1, x2, y2, class_name, conf).
+        frame_detections = [
+            (x1, y1, x2, y2, label, conf)
+            for (class_id, conf, x1, y1, x2, y2, label) in raw_detections
+        ]
 
         all_frames.append(frame.copy())
         all_detections.append(frame_detections)
