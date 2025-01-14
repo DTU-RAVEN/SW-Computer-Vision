@@ -3,3 +3,5 @@ docs
 
 software/src/application/.DS_Store
 *.pt
+/frames
+/colmap_project
