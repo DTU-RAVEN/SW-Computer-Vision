@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python3.12 -m venv venv
+python3.10 -m venv venv
 
 source venv/bin/activate
 
