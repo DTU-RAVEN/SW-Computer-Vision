@@ -9,9 +9,12 @@ before_script:
   - python -m venv venv
   - source venv/bin/activate
   - pip install -r requirements.txt
-  - tags: linux
+  tags:
+    - linux
 
 test:
   script:
     - ./software/scripts/run_pylint_on_dir.sh software/src
     - doxygen Doxyfile
+  tags:
+    -linux
