@@ -71,8 +71,8 @@ if __name__ == "__main__":
     # Adjust 'frame_skip' as needed. 
     # If your drone footage moves quickly, you might want frame_skip=5 or less.
     # If it’s slow-moving or very large, you can try 20 or more to reduce overlap.
-    mosaic = create_mosaic_with_stitcher(video_file, frame_skip=5)
+    mosaic = create_mosaic_with_stitcher(video_file, frame_skip=3)
     
     # 6. Save or display the result
     cv2.imwrite("mosaic.jpg", mosaic)
-    print("Stitched mosaic saved as advanced_stitched_mosaic.jpg")
+    print("Stitched mosaic saved")
