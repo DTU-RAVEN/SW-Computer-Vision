@@ -5,7 +5,7 @@ cache:
     - .cache/pip
 
 before_script:
-  - apt get update
+  - apt update -y
   - python --version ; pip --version  # For debugging
   - python -m venv venv
   - source venv/bin/activate
