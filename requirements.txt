@@ -1,6 +1,6 @@
-astroid==3.3.8
+        astroid==3.3.8
 certifi==2024.12.14
-charset-normalizer==3.4.1
+charset-normalizer==3.4.1       
 cycler==0.12.1
 dill==0.3.9
 filelock==3.16.1
