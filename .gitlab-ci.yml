@@ -5,10 +5,11 @@ cache:
     - .cache/pip
 
 before_script:
+  - apt get update
   - python --version ; pip --version  # For debugging
   - python -m venv venv
   - source venv/bin/activate
-  - pip install -r requirements.txt
+  - pip install -r requirements.txt 
 
 test:
   script:
