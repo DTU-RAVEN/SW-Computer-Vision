@@ -15,8 +15,8 @@ from cv_bridge import CvBridge
 # ---------------------------
 # HYPERPARAMETERS
 # ---------------------------
-model_name = "yolov8l.pt"
-conf_threshold = 0.01
+model_name = "yolov8s.pt"
+conf_threshold = 0.1
 iou_threshold = 0.50
 MAX_FRAMES = 200   
 MAX_MISSES = 5
