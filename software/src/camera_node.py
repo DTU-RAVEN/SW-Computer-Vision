@@ -6,7 +6,7 @@ import cv2
 
 # Toggle between using live camera feed and MP4 file.
 USE_MP4_FILE = True  # Set to True to use run.mp4, False for live camera
-video_path = "videos/football.mp4"
+video_path = "software/src/videos/football.mp4"
 
 class CameraNode(Node):
     """ @brief Camera node class
