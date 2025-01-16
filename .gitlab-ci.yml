@@ -7,7 +7,7 @@ cache:
 before_script:
   - apt update -y
   - apt upgrade -y
-  - apt install -y c++ g++ clang++ nvc++ pgc++ icpc icpx
+  - apt install -y g++
   - python --version ; pip --version  # For debugging
   - python -m venv venv
   - source venv/bin/activate
