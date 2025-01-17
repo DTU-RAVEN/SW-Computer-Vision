@@ -1,0 +1,21 @@
+image: python:3.14.0a4-slim-bullseye
+
+cache:
+  paths:
+    - .cache/pip
+
+before_script:
+  - apt-get update -qq
+  - apt-get install -y g++
+  - pip install --upgrade pip setuptools wheel
+  - python --version ; pip --version  # For debugging
+  - python -m venv venv
+  - source venv/bin/activate
+  - pip install -r requirements.txt 
+
+test:
+  script:
+    - ./software/scripts/run_pylint_on_dir.sh software/src
+    - doxygen Doxyfile
+  tags:
+    - linux
