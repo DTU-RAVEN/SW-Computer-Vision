@@ -3,3 +3,4 @@ docs
 
 software/src/application/.DS_Store
 *.pt
+/colmap_project
