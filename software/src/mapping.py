@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from tqdm import tqdm  # Import tqdm for the progress bar
 
 cv2.ocl.setUseOpenCL(False)
 
@@ -21,19 +22,22 @@ def create_mosaic_with_stitcher(video_path, frame_skip=10):
     
     frames = []
     frame_index = 0
-    
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        # 2. Sample frames: pick every 'frame_skip'-th frame
-        if frame_index % frame_skip == 0:
-            # Optionally resize if you want smaller frames
-            # frame = cv2.resize(frame, None, fx=0.5, fy=0.5)
-            frames.append(frame)
-        
-        frame_index += 1
+
+    # Use tqdm to show progress while reading frames
+    with tqdm(total=total_frames, desc="Reading frames") as pbar:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # 2. Sample frames: pick every 'frame_skip'-th frame
+            if frame_index % frame_skip == 0:
+                # Optionally resize if you want smaller frames
+                # frame = cv2.resize(frame, None, fx=0.5, fy=0.5)
+                frames.append(frame)
+            
+            frame_index += 1
+            pbar.update(1)  # Update progress bar for each frame read
 
     cap.release()
     print(f"Collected {len(frames)} frames for stitching.")
@@ -42,8 +46,9 @@ def create_mosaic_with_stitcher(video_path, frame_skip=10):
         raise ValueError("Not enough frames to stitch. Try reducing 'frame_skip'.")
     
     # 3. Create the stitcher object in SCANS mode
-    #    (If this fails, ensure you have a recent version of OpenCV contrib)
     stitcher = cv2.Stitcher_create(cv2.Stitcher_SCANS)
+    # stitcher = cv2.Stitcher_create(cv2.Stitcher_PANORAMA)
+    
     
     # 4. Stitch the frames
     print("Stitching...")
@@ -55,7 +60,6 @@ def create_mosaic_with_stitcher(video_path, frame_skip=10):
     print("Stitching done. Cropping the mosaic...")
     
     # 5. Crop the result to remove black borders
-    # Convert to grayscale to find non-zero region
     gray = cv2.cvtColor(stitched, cv2.COLOR_BGR2GRAY)
     coords = cv2.findNonZero(gray)
     if coords is not None:
@@ -67,12 +71,11 @@ def create_mosaic_with_stitcher(video_path, frame_skip=10):
 if __name__ == "__main__":
     # Example usage
     video_file = '/Users/fredmac/Documents/DTU-FredMac/Drone/archive/Berghouse.mp4'
-    
+    # video_file = '/Users/fredmac/Documents/DTU-FredMac/Drone/archive/DJI_0574.MP4'
+
     # Adjust 'frame_skip' as needed. 
-    # If your drone footage moves quickly, you might want frame_skip=5 or less.
-    # If it’s slow-moving or very large, you can try 20 or more to reduce overlap.
-    mosaic = create_mosaic_with_stitcher(video_file, frame_skip=5)
+    mosaic = create_mosaic_with_stitcher(video_file, frame_skip=3)
     
     # 6. Save or display the result
-    cv2.imwrite("mosaic.jpg", mosaic)
+    cv2.imwrite("mosaic3.jpg", mosaic)
     print("Stitched mosaic saved")
