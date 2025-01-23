@@ -60,9 +60,9 @@ class CameraNode(Node):
             ## Video capture instance
             self.cap = cv2.VideoCapture(video_path)
             if not self.cap.isOpened():
-                self.get_logger().error("Could not open video file run.mp4.")
+                self.get_logger().error("Could not open video file")
             else:
-                self.get_logger().info("Opened run.mp4 for video streaming.")
+                self.get_logger().info("Opened video file for video streaming.")
         else:
             self.cap = cv2.VideoCapture(0)
             if not self.cap.isOpened():

@@ -2,6 +2,16 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Set Up Computer Vision",
+            "type": "shell",
+            "command": "./software/scripts/computer_vision_setup.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "Setup Virtual Environment",
             "type": "shell",
             "command": "./software/scripts/setup.sh", //its like writing in console make //btw you can others commands like clean make build etc
@@ -11,9 +21,18 @@
             }
         },
         {
-            "label": "Run",
+            "label": "Run Camera Node",
             "type": "shell",
-            "command": "venv/bin/python3 software/src/main.py", //its like writing in console make //btw you can others commands like clean make build etc
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/computer-vision && python3 software/src/camera_node.py", 
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run Object Detection Node",
+            "type": "shell",
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/computer-vision && python3 software/src/object_detection_node.py", 
             "group": {
                 "kind": "build",
                 "isDefault": true
