@@ -16,11 +16,10 @@ from cv_bridge import CvBridge
 # HYPERPARAMETERS
 # ---------------------------
 model_name = "yolov8s.pt"
-conf_threshold = 0.1
-iou_threshold = 0.50
-MAX_FRAMES = 200   
-MAX_MISSES = 5
-ALPHA = 0.7
+conf_threshold = 0.1  # minimum confidence for detection
+iou_threshold = 0.50  # removes redundant boxes
+MAX_MISSES = 1  # how many frames to keep track of a missing object
+ALPHA = 1  # smoothing factor (how much to blend with previous frame. 1 = no smoothing)
 
 TARGET_CLASS_IDS = {
     0,   # person 
@@ -67,15 +66,17 @@ class ObjectDetectionNode(Node):
         super().__init__('object_detection_node')
 
         self.subscription = self.create_subscription(
-            Image,
-            '/camera/image',
-            self.listener_callback,
-            10
+            Image,            # Message type: The type of message to subscribe to (sensor_msgs/Image)
+            '/camera/image',  # Topic name: The ROS topic to listen to
+            self.listener_callback,  # Callback: Function called when message is received
+            10               # Queue size: How many messages to buffer if processing falls behind
         )
+
+        
         self.publisher_ = self.create_publisher(String, '/vision/object_spotted', 10)
         self.bridge = CvBridge()
 
-        ## Keep next track id
+        ## Initialize next track id as 0
         self.next_track_id = 0
 
         # Decide on device
