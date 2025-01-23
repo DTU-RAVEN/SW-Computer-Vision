@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Create and activate virtual environment
-python3.12 -m venv venv
+python3.8 -m venv venv
 source venv/bin/activate
 
 # Find all requirements files and store them in an array
