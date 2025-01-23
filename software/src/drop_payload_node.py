@@ -10,12 +10,22 @@ import math
 
 class PayloadDropNode(Node):
     """
-    This ROS2 node coordinates payload drop logic:
-    1) Checks if UAV is above 50' altitude.
-    2) Checks if UAV is within the air drop boundary polygon.
-    3) Subscribes to object detection messages.
-    4) Ensures a drop happens only if a new lap has started.
-    5) Publishes a signal to /payload_release when conditions are met.
+    A ROS2 node that manages autonomous payload dropping for UAV missions.
+    
+    This node implements a state machine that coordinates payload dropping based on multiple conditions:
+    - Altitude threshold verification (minimum 50' AGL)
+    - Geographic boundary containment check
+    - Object detection integration
+    - Lap-based dropping logic to prevent multiple drops per lap
+    
+    Publishers:
+        - /payload_release (Bool): Triggers the physical payload release mechanism
+        
+    Subscribers:
+        - /telemetry/gps (NavSatFix): Current GPS position
+        - /telemetry/altitude (Float32): Current altitude AGL in feet
+        - /vision/object_spotted (String): Object detection results in JSON format
+        - /mission/lap_completed (Bool): Signals completion of mission lap
     """
 
     def __init__(self):
@@ -92,8 +102,18 @@ class PayloadDropNode(Node):
 
     def object_detection_callback(self, msg: String):
         """
-        Parse object detection results. If the conditions to drop are satisfied,
-        call a function to trigger the payload release.
+        Processes incoming object detection messages and initiates payload drop if conditions are met.
+        
+        The detection message is expected to be a JSON string containing a 'detections' array.
+        Each detection can represent various objects (e.g., cars, persons, targets).
+        
+        Args:
+            msg (String): JSON formatted string containing detection results
+                Format: {"detections": [{object data...}, ...]}
+        
+        Note:
+            The current implementation drops on any detection. In practice, you might
+            want to filter based on specific object types or confidence scores.
         """
         if not self.is_ready_for_drop():
             return
@@ -124,10 +144,16 @@ class PayloadDropNode(Node):
     # ---------------------------
     def is_ready_for_drop(self) -> bool:
         """
-        Checks the main conditions for dropping a payload:
-        1. We have not dropped a payload this lap.
-        2. We are inside the air drop boundary polygon.
-        3. The altitude is >= minimum drop altitude.
+        Validates all conditions required for a safe payload drop.
+        
+        This method implements a multi-stage validation process:
+        1. Verifies lap-based drop eligibility (one drop per lap)
+        2. Confirms valid GPS signal
+        3. Ensures minimum safe altitude
+        4. Validates position within designated drop zone
+        
+        Returns:
+            bool: True if all drop conditions are satisfied, False otherwise
         """
         # Already dropped a payload this lap?
         if self.payload_dropped_this_lap:
@@ -157,13 +183,25 @@ class PayloadDropNode(Node):
 
     def is_within_boundary(self, lat: float, lon: float) -> bool:
         """
-        Point-in-polygon check using the ray-casting algorithm.
-        Returns True if (lat, lon) is inside the polygon.
-        Polygon is a list of (lat, lon) tuples.
+        Implements the ray-casting algorithm to determine if a point lies within a polygon.
+        
+        This implementation uses a simplified planar geometry approach suitable for
+        small geographic areas. For more precise results or larger areas, consider
+        using a geodesic library like GeoPy or Shapely.
+        
+        Algorithm:
+        1. Casts a ray from the test point
+        2. Counts intersections with polygon edges
+        3. Uses even-odd rule to determine containment
+        
+        Args:
+            lat (float): Latitude of the point to test
+            lon (float): Longitude of the point to test
+            
+        Returns:
+            bool: True if point is inside the polygon, False otherwise
+            
         """
-        # Basic ray-casting or winding number approach in lat-lon.  
-        # For small areas, you can treat lat/lon as planar coordinates.  
-        # For large or more accurate checks, use a geospatial library.
         polygon = self.drop_boundary_polygon
         inside = False
         n = len(polygon)
@@ -184,6 +222,15 @@ class PayloadDropNode(Node):
 
 
 def main(args=None):
+    """
+    Main entry point for the payload drop node.
+    
+    Initializes the ROS2 system, creates the node instance, and handles
+    graceful shutdown on keyboard interrupt.
+    
+    Args:
+        args: Command line arguments passed to rclpy.init()
+    """
     rclpy.init(args=args)
     node = PayloadDropNode()
     try:

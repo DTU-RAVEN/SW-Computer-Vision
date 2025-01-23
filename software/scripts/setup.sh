@@ -5,7 +5,7 @@ python3.12 -m venv venv
 source venv/bin/activate
 
 # Find all requirements files and store them in an array
-requirements_files=(requirements_*.txt)
+requirements_files=(requirements*.txt)
 
 # Check if any requirements files exist
 if [ ${#requirements_files[@]} -eq 0 ]; then
