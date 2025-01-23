@@ -1,3 +1,5 @@
+import sys
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -75,8 +77,8 @@ class CameraNode(Node):
             self.cap.release()
         super().destroy_node()
 
-def main(args: list[str] = []):
-    rclpy.init(args=args)
+def main():
+    rclpy.init(args=sys.argv)
     camera_node = CameraNode()
     try:
         rclpy.spin(camera_node)
