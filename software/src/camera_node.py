@@ -1,20 +1,48 @@
-import sys
+"""
+Camera Node Module
 
+This module implements a ROS2 node that publishes camera frames as ROS Image messages.
+It can handle both live camera feed and video file playback, publishing frames at 10Hz.
+
+Features:
+- Supports both webcam and MP4 video file input
+- Automatic video looping when reaching end of file
+- Converts OpenCV frames to ROS Image messages
+- Publishes images with current ROS time stamps
+"""
+
+import sys
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 
-# Toggle between using live camera feed and MP4 file.
+# Configuration for video source
 USE_MP4_FILE = True  # Set to True to use run.mp4, False for live camera
 video_path = "software/src/videos/football.mp4"
 
 class CameraNode(Node):
-    """ @brief Camera node class
     """
+    A ROS2 node that captures frames from a camera or video file and publishes them.
+    
+    This node can operate in two modes:
+    1. Camera mode: Captures frames from a connected webcam
+    2. Video file mode: Reads frames from an MP4 file with automatic looping
+    
+    Publishers:
+        /camera/image (sensor_msgs/Image): Publishes captured frames as ROS Image messages
+    """
+
     def __init__(self):
-        """ @brief Camera Node constructor function
+        """
+        Initialize the camera node with necessary publishers and video capture setup.
+        
+        The constructor:
+        - Sets up the ROS2 publisher for image messages
+        - Initializes video capture (either camera or file)
+        - Creates a timer for periodic frame publishing
+        - Sets up CvBridge for OpenCV-ROS image conversion
         """
         super().__init__('camera_node')
 
@@ -45,32 +73,41 @@ class CameraNode(Node):
         self.get_logger().info("Camera node started, publishing to /camera/image...")
 
     def timer_callback(self):
-        """ @brief Camera node timer callback
+        """
+        Timer callback function executed at 10Hz to publish camera frames.
+        
+        This method:
+        1. Captures a new frame from the video source
+        2. Handles video file looping if end-of-file is reached
+        3. Converts the OpenCV frame to a ROS Image message
+        4. Adds current timestamp to the message
+        5. Publishes the frame to /camera/image topic
+        
+        Error handling is implemented for failed frame captures and EOF conditions.
         """
         ret, frame = self.cap.read()
 
-        # If using MP4 and we reach end-of-file, loop back.
+        # Handle video file looping
         if USE_MP4_FILE and not ret:
             self.get_logger().warning("Reached end of video. Looping back to start.")
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Reset video to first frame
             ret, frame = self.cap.read()
 
-        # If reading frame failed (for camera or unexpected mp4 issue), log and skip publishing.
+        # Error handling for frame capture failures
         if not ret:
             self.get_logger().warning("Failed to read frame from camera/video source.")
             return
 
-        # Convert OpenCV image (BGR) to ROS Image message
+        # Convert and publish the frame
         ros_image = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
-
-        # Attach the current ROS2 time to the header
-        ros_image.header.stamp = self.get_clock().now().to_msg()
-
-        # Publish the image
+        ros_image.header.stamp = self.get_clock().now().to_msg()  # Add timestamp
         self.publisher_.publish(ros_image)
 
     def destroy_node(self):
-        """ @brief Destroy this node
+        """
+        Clean up node resources before shutdown.
+        
+        Ensures proper release of video capture resources to prevent device/file handle leaks.
         """
         # Release the video/camera resource before shutting down
         if self.cap.isOpened():
@@ -78,6 +115,12 @@ class CameraNode(Node):
         super().destroy_node()
 
 def main():
+    """
+    Main entry point for the camera node.
+    
+    Initializes ROS2 context, creates and runs the camera node.
+    Handles graceful shutdown on keyboard interrupt.
+    """
     rclpy.init(args=sys.argv)
     camera_node = CameraNode()
     try:
