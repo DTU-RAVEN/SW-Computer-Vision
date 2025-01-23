@@ -29,8 +29,8 @@ Configuration Parameters:
         - time_limit: Maximum processing time in seconds
 """
 
-# Path to the drone video file
-video_path = '/Users/fredmac/Documents/DTU-FredMac/Drone/archive/Berghouse shorter.mp4'
+# Path to the drone video file (change to fit you video)
+video_path = '/videos/mapping_video.mp4'
 
 # Directory to store ODM output (will be created if it doesn't exist)
 project_dir = "odm_project"
