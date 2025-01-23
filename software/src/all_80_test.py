@@ -1,3 +1,11 @@
+"""
+Object Detection and Tracking System using YOLOv8
+
+This script implements real-time object detection and tracking using the YOLOv8 model
+with ByteTrack integration. It processes video input and provides an interactive
+interface for viewing detection results.
+"""
+
 import cv2
 import torch
 from ultralytics import YOLO
@@ -16,6 +24,7 @@ ALPHA = 0.7                 # Bounding box smoothing factor (0=no smoothing, 1=f
 
 # Removed TARGET_CLASS_IDS since filtering is not needed anymore
 
+# Dictionary mapping class IDs to custom labels with scale specifications
 CUSTOM_LABELS = {
     0:  "Person / Mannequin",
     2:  "Car (>1:8 Scale Model)",
@@ -36,8 +45,15 @@ CUSTOM_LABELS = {
 
 def draw_detections(frame, detections):
     """
-    Draw bounding boxes and labels on a copy of the frame based on filtered detections.
-    detections: list of tuples (x1, y1, x2, y2, class_name, conf, track_id)
+    Visualize object detections on a video frame.
+    
+    Args:
+        frame (np.ndarray): Input video frame
+        detections (list): List of tuples containing detection data
+                          (x1, y1, x2, y2, class_name, confidence, track_id)
+    
+    Returns:
+        np.ndarray: Frame with annotated detection boxes and labels
     """
     annotated_frame = frame.copy()
     for (x1, y1, x2, y2, class_name, conf, track_id) in detections:
@@ -55,6 +71,16 @@ def draw_detections(frame, detections):
     return annotated_frame
 
 def main():
+    """
+    Main execution function that handles:
+    - Model initialization and device selection
+    - Video processing and object tracking
+    - Temporal smoothing of bounding boxes
+    - Interactive visualization interface
+    
+    The function implements object persistence across frames and
+    smooth tracking using exponential moving average for bounding boxes.
+    """
     device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     print(f"Using device: {device}")
 
@@ -76,8 +102,9 @@ def main():
     all_detections = []
     frame_count = 0
 
-    # track_history keeps track of each object's last-known bbox and how many times it has been missed
-    # Format: track_id -> {"bbox": (x1, y1, x2, y2), "conf": float, "label": str, "miss_count": int}
+    # Track history dictionary for object persistence
+    # Key: track_id
+    # Value: dict containing bbox coordinates, confidence, label, and miss counter
     track_history = {}
 
     for result in tracking_results:
@@ -151,6 +178,12 @@ def main():
     cv2.namedWindow("Detections", cv2.WINDOW_NORMAL)
 
     def on_trackbar(pos):
+        """
+        Callback function for the frame scrubbing trackbar.
+        
+        Args:
+            pos (int): Current position of the trackbar (frame index)
+        """
         if 0 <= pos < len(all_frames):
             frame = all_frames[pos]
             detections = all_detections[pos]
