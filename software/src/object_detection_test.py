@@ -1,22 +1,33 @@
 import cv2
 import torch
-# ---------------- NEW IMPORT ----------------
 from object_detection_shared import initialize_model, parse_detection_result
-# --------------------------------------------
 
-# ---------------- TOGGLE --------------------
-USE_WEBCAM = False  # Set to True to use webcam instead of a video file.
-# -------------------------------------------------
+"""
+Object Detection Test Module
 
-# Paths to potential video files; only used if USE_WEBCAM=False
+This module implements real-time object detection using YOLOv8 model with support for both
+webcam and video file inputs. It includes custom class filtering and visualization features.
+
+Key Features:
+- Supports both webcam and video file input sources
+- Hardware acceleration (CUDA/MPS) when available
+- Custom class filtering with specific target categories
+- Real-time visualization with confidence scores
+- Video scrubbing interface for file playback
+"""
+
+# Configuration flags
+USE_WEBCAM = False  # Toggle between webcam (True) and video file (False) input
+
+# File paths and model configuration
 video_path = '/Users/fredmac/Documents/DTU-FredMac/Drone/archive/Berghouse.mp4'
 
-# HYPERPARAMETERS
+# Model and detection parameters
 model_name = "yolov8s.pt"
-conf_threshold = 0.1       # Lower confidence threshold to increase recall
-iou_threshold = 0.50       # Slightly higher IoU threshold to help with tighter boxes
-MAX_FRAMES = 200
-ALPHA = 0.7                # (Unused without tracking)
+conf_threshold = 0.1       # Confidence threshold for detection filtering
+iou_threshold = 0.50      # Intersection over Union threshold for NMS
+MAX_FRAMES = 200          # Maximum number of frames to process from video
+ALPHA = 0.7              # Transparency factor (reserved for tracking features)
 
 # Define the set of COCO class IDs that approximate your desired categories
 TARGET_CLASS_IDS = {
@@ -58,8 +69,15 @@ CUSTOM_LABELS = {
 
 def draw_detections(frame, detections):
     """
-    Draw bounding boxes and labels on a copy of the frame based on detections.
-    detections: list of tuples (x1, y1, x2, y2, class_name, conf)
+    Visualizes object detections on a frame with bounding boxes and labels.
+
+    Args:
+        frame (np.ndarray): Input frame/image
+        detections (list): List of tuples containing detection data
+                          (x1, y1, x2, y2, class_name, confidence)
+
+    Returns:
+        np.ndarray: Frame with drawn detections
     """
     annotated_frame = frame.copy()
     for (x1, y1, x2, y2, class_name, conf) in detections:
@@ -78,14 +96,25 @@ def draw_detections(frame, detections):
 
 
 def main():
+    """
+    Main execution function for object detection.
+    
+    Workflow:
+    1. Sets up hardware device (CUDA/MPS/CPU)
+    2. Initializes YOLOv8 model
+    3. Processes input source (webcam/video)
+    4. Performs real-time detection and visualization
+    5. Handles user interaction and display
+    """
     print("Starting object detection test...")
 
+    # Device selection logic - prioritize GPU acceleration
     if torch.backends.mps.is_available():
-        device = torch.device("mps")
+        device = torch.device("mps")  # Apple Silicon GPU
     elif torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = torch.device("cuda")  # NVIDIA GPU
     else:
-        device = torch.device("cpu")
+        device = torch.device("cpu")  # Fallback to CPU
     print(f"Using device: {device}")
 
     # Initialize the model
@@ -100,7 +129,12 @@ def main():
     cv2.namedWindow("Detections", cv2.WINDOW_NORMAL)
 
     if USE_WEBCAM:
-        # ------------------ WEBCAM FEED ------------------
+        """
+        Webcam Processing Loop
+        
+        Continuously captures frames from webcam, performs detection,
+        and displays results in real-time until ESC is pressed.
+        """
         print("Using webcam feed...")
         cap = cv2.VideoCapture(0)  # 0 means default webcam; change if needed
 
@@ -145,7 +179,13 @@ def main():
         cv2.destroyAllWindows()
 
     else:
-        # ------------------ VIDEO FILE -------------------
+        """
+        Video File Processing
+        
+        Processes a video file in batches, storing frames and detections
+        for interactive playback. Includes a scrubbing interface for
+        frame navigation.
+        """
         print(f"Using video file: {video_path}")
         # Use YOLOv8's streaming API on a video source
         results = model.predict(
@@ -183,6 +223,12 @@ def main():
 
         # Build a player interface to scrub frames
         def on_trackbar(pos):
+            """
+            Callback function for the video scrubbing trackbar.
+            
+            Args:
+                pos (int): Current position in the video timeline
+            """
             if 0 <= pos < len(all_frames):
                 frame = all_frames[pos]
                 detections = all_detections[pos]

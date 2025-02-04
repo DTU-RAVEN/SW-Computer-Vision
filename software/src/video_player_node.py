@@ -11,10 +11,26 @@ import cv2
 import json
 
 class VisualizationNode(Node):
-    """ @brief Visualization node class
+    """
+    A ROS2 node for visualizing object detection results overlaid on camera images.
+    
+    This node subscribes to two topics:
+    1. Camera images ('/camera/image')
+    2. Detection results ('/vision/object_spotted')
+    
+    It processes incoming detection data (bounding boxes, labels, confidence scores)
+    and visualizes them in real-time on the camera feed using OpenCV.
     """
     def __init__(self):
-        """ @brief Visualization Node constructor
+        """
+        Initialize the visualization node with necessary subscribers and data structures.
+        
+        Sets up:
+        - Image subscriber for raw camera feed
+        - String subscriber for JSON-formatted detection results
+        - CvBridge for ROS<->OpenCV image conversion
+        - Timer for OpenCV GUI updates
+        - Storage for current detection results
         """
         super().__init__('visualization_node')
 
@@ -48,7 +64,20 @@ class VisualizationNode(Node):
         self.timer = self.create_timer(0.05, self.opencv_gui_loop)
 
     def camera_callback(self, msg):
-        """Callback for receiving camera frames (ROS Image)."""
+        """
+        Process incoming camera frames and overlay detection visualizations.
+        
+        Args:
+            msg (sensor_msgs.msg.Image): The incoming ROS Image message
+        
+        The method:
+        1. Converts ROS Image to OpenCV format
+        2. For each stored detection:
+           - Extracts bounding box coordinates and metadata
+           - Draws rectangle around detected object
+           - Adds label with confidence score
+        3. Displays the annotated frame
+        """
         try:
             # Convert the ROS Image to an OpenCV image (BGR)
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -90,7 +119,26 @@ class VisualizationNode(Node):
         # We won't call cv2.waitKey(1) here—it's called in a timer callback (opencv_gui_loop).
 
     def detections_callback(self, msg):
-        """Callback for receiving detection results (JSON)."""
+        """
+        Process incoming detection results from JSON format.
+        
+        Args:
+            msg (std_msgs.msg.String): JSON-encoded detection results
+        
+        Expected JSON format:
+        {
+            "detections": [
+                {
+                    "object_id": int,
+                    "position": [cx, cy, width, height],
+                    "label": str,
+                    "confidence": float,
+                    "timestamp": float
+                },
+                ...
+            ]
+        }
+        """
         try:
             data = json.loads(msg.data)
             self.current_detections = data.get("detections", [])
@@ -100,12 +148,26 @@ class VisualizationNode(Node):
 
     def opencv_gui_loop(self):
         """
-        This timer callback just calls `cv2.waitKey(1)` so that OpenCV
-        processes the GUI events. Without it, the imshow window won’t update.
+        Timer callback to process OpenCV GUI events.
+        
+        Called periodically (every 50ms) to ensure proper window updates
+        and event processing in OpenCV's windowing system. Without this,
+        the visualization window would appear frozen.
         """
         cv2.waitKey(1)
 
 def main(args: list[str] = []):
+    """
+    Main entry point for the visualization node.
+    
+    Args:
+        args (list[str]): Command-line arguments passed to the node
+    
+    Handles:
+    1. ROS2 initialization
+    2. Node creation and spinning
+    3. Graceful shutdown with proper cleanup
+    """
     rclpy.init(args=args)
     node = VisualizationNode()
 

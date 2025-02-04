@@ -1,3 +1,18 @@
+"""
+Real-time Object Detection and Tracking System
+
+This module implements a real-time object detection and tracking system using YOLOv8 and ByteTrack.
+It processes video input, detecting and tracking specific objects while implementing temporal
+smoothing and object persistence across frames.
+
+Key Features:
+- Object detection using YOLOv8
+- Object tracking using ByteTrack
+- Temporal bounding box smoothing
+- Object persistence across frame drops
+- Interactive frame scrubbing interface
+"""
+
 import cv2
 import torch
 from ultralytics import YOLO
@@ -6,6 +21,16 @@ from ultralytics import YOLO
 video_path = "videos/football.mp4"
 # video_path = "videos/traffic.mp4"
 
+"""
+Configuration Parameters:
+- model_name: YOLOv8 model variant to use
+- conf_threshold: Minimum confidence score for detection acceptance
+- iou_threshold: Intersection over Union threshold for detection merging
+- MAX_FRAMES: Maximum number of frames to process
+- MAX_MISSES: Number of frames to maintain tracking without detection
+- ALPHA: Exponential smoothing factor for bounding box positions
+"""
+
 # HYPERPARAMETERS
 model_name = "yolov8l.pt"
 conf_threshold = 0.1       # Lower confidence threshold to increase recall
@@ -13,6 +38,12 @@ iou_threshold = 0.50        # Slightly higher IoU threshold to help with tighter
 MAX_FRAMES = 200
 MAX_MISSES = 5              # How many frames to persist an object if it temporarily disappears
 ALPHA = 0.7                 # Bounding box smoothing factor (0=no smoothing, 1=full smoothing)
+
+"""
+Target Classes:
+Defines specific COCO dataset class IDs for detection filtering.
+Each ID corresponds to objects of interest for this application.
+"""
 
 # Define the set of COCO class IDs that approximate your desired categories
 TARGET_CLASS_IDS = {
@@ -32,6 +63,12 @@ TARGET_CLASS_IDS = {
     38,  # tennis racket
     59,  # bed
 }
+
+"""
+Custom Labels:
+Maps COCO class IDs to application-specific labels with additional
+context about object specifications and requirements.
+"""
 
 CUSTOM_LABELS = {
     0:  "Person / Mannequin",
@@ -53,8 +90,15 @@ CUSTOM_LABELS = {
 
 def draw_detections(frame, detections):
     """
-    Draw bounding boxes and labels on a copy of the frame based on filtered detections.
-    detections: list of tuples (x1, y1, x2, y2, class_name, conf, track_id)
+    Visualize object detections on video frames.
+    
+    Args:
+        frame (np.ndarray): Input video frame
+        detections (list): List of detection tuples containing:
+            (x1, y1, x2, y2, class_name, confidence, track_id)
+    
+    Returns:
+        np.ndarray: Frame with annotated bounding boxes and labels
     """
     annotated_frame = frame.copy()
     for (x1, y1, x2, y2, class_name, conf, track_id) in detections:
@@ -72,24 +116,46 @@ def draw_detections(frame, detections):
     return annotated_frame
 
 def main():
+    """
+    Main execution function implementing the object detection and tracking pipeline.
+    
+    The pipeline consists of several key components:
+    1. Device selection (MPS/CPU)
+    2. Model initialization and configuration
+    3. Frame-by-frame processing with tracking
+    4. Temporal smoothing of bounding boxes
+    5. Object persistence management
+    6. Interactive visualization
+    """
+    
+    # Device Selection
     device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
     print(f"Using device: {device}")
 
-    # Load YOLOv8 model
+    # Model Initialization
     model = YOLO(model_name).to(device)
 
-    # Use YOLOv8's tracking API with ByteTrack
+    # Configure and initialize tracking
     tracking_results = model.track(
         source=video_path,
         device=device,
         conf=conf_threshold,
         iou=iou_threshold,
-        tracker="config/bytetrack.yaml",  # reference to the local ByteTrack config file
+        tracker="config/bytetrack.yaml",  # ByteTrack configuration
         stream=True,
         show=False
     )
 
-
+    """
+    Tracking State Management:
+    track_history maintains the state of tracked objects across frames:
+    - bbox: Last known bounding box coordinates
+    - conf: Detection confidence
+    - label: Object class label
+    - miss_count: Frames since last detection
+    """
+    track_history = {}
+    
     all_frames = []
     all_detections = []
     frame_count = 0
@@ -99,6 +165,15 @@ def main():
     track_history = {}
 
     for result in tracking_results:
+        """
+        Frame Processing Loop:
+        1. Extract and filter detections
+        2. Apply temporal smoothing
+        3. Update tracking history
+        4. Handle missing detections
+        5. Prepare visualization data
+        """
+        
         frame_count += 1
         if frame_count > MAX_FRAMES:
             break
@@ -111,6 +186,12 @@ def main():
 
         # If we get no detections, we just increment miss_count for all in track_history
         if result.boxes is not None and len(result.boxes) > 0:
+            """
+            Detection Processing:
+            - Filter by target classes
+            - Apply temporal smoothing
+            - Update tracking history
+            """
             for box in result.boxes:
                 class_id = int(box.cls[0])
                 if class_id not in TARGET_CLASS_IDS:
@@ -143,6 +224,11 @@ def main():
 
                 current_detections.append(track_id)
 
+        """
+        Missing Object Management:
+        - Increment miss counter for undetected objects
+        - Remove objects exceeding MAX_MISSES threshold
+        """
         # Increase miss_count for those not detected in this frame
         for t_id in list(track_history.keys()):
             if t_id not in current_detections:
@@ -151,6 +237,12 @@ def main():
                 if track_history[t_id]["miss_count"] > MAX_MISSES:
                     del track_history[t_id]  # remove from history
        
+        """
+        Visualization Data Preparation:
+        Compile final list of objects to display, including:
+        - Currently detected objects
+        - Recently missing objects within MAX_MISSES threshold
+        """
         # Build a list of final bounding boxes to draw (both newly seen and persisted)
         frame_detections = []
         for t_id, info in track_history.items():
@@ -166,6 +258,10 @@ def main():
         all_frames.append(frame.copy())
         all_detections.append(frame_detections)
 
+    """
+    Interactive Visualization Interface:
+    Creates a window with a trackbar for frame scrubbing
+    """
     # Build a player interface to scrub frames
     cv2.namedWindow("Detections", cv2.WINDOW_NORMAL)
 

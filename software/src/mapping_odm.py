@@ -1,8 +1,3 @@
-import os
-import subprocess
-import cv2
-import shutil
-
 """
 OpenDroneMap (ODM) Video Processing Script
 
@@ -10,6 +5,10 @@ This script processes drone video footage using OpenDroneMap to generate mapping
 It extracts frames from a video file and processes them through ODM to create
 orthophotos, point clouds, and other mapping products.
 """
+import os
+import subprocess
+import cv2
+import shutil
 
 # === User-Defined Parameters ===
 """
@@ -28,20 +27,10 @@ Configuration Parameters:
         - skip_3dmodel: Skip 3D model generation to save time
         - time_limit: Maximum processing time in seconds
 """
-
-# Path to the drone video file
-video_path = '/Users/fredmac/Documents/DTU-FredMac/Drone/archive/Berghouse shorter.mp4'
-
-# Directory to store ODM output (will be created if it doesn't exist)
+video_path = '/videos/mapping_video.mp4'
 project_dir = "odm_project"
-
-# Frame extraction rate: number of frames per second to extract from the video
-frame_rate = 4.0  # Adjust as needed
-
-# Flag to use Docker for running OpenDroneMap
+frame_rate = 4.0 
 use_docker = True
-
-# ODM parameters (you can adjust these as needed)
 odm_settings = {
     "optimize_disk_space": True,
     "resize_to": "2400",
