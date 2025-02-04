@@ -39,6 +39,15 @@
             }
         },
         {
+            "label": "Run Object Detection Visual",
+            "type": "shell",
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/computer-vision && python3 software/src/object_detection_test.py", 
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "Freeze Requirements",
             "type": "shell",
             "command": "./software/scripts/freeze_requirements.sh", //its like writing in console make //btw you can others commands like clean make build etc
