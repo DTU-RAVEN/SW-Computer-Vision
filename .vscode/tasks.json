@@ -1,0 +1,90 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Set Up Computer Vision",
+            "type": "shell",
+            "command": "./software/scripts/computer_vision_setup.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Setup Virtual Environment",
+            "type": "shell",
+            "command": "./software/scripts/setup.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run Camera Node",
+            "type": "shell",
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd /workspaces/computer-vision && python3 software/src/camera_node.py", 
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run Object Detection Node",
+            "type": "shell",
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/computer-vision && python3 software/src/object_detection_node.py", 
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run Object Detection Visual",
+            "type": "shell",
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/computer-vision && python3 software/src/object_detection_test.py", 
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Freeze Requirements",
+            "type": "shell",
+            "command": "./software/scripts/freeze_requirements.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "MyPy src",
+            "type": "shell",
+            "command": "./software/scripts/run_mypy_on_src.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": ["software/src"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Pylint src",
+            "type": "shell",
+            "command": "./software/scripts/run_pylint_on_dir.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": ["software/src"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Generate Docs",
+            "type": "shell",
+            "command": "doxygen Doxyfile && google-chrome docs/html/index.html", //its like writing in console make //btw you can others commands like clean make build etc
+            "args": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
