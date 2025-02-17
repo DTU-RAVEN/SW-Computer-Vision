@@ -1,11 +1,10 @@
 import cv2
 import torch
-from object_detection_shared import initialize_model, parse_detection_result
+from object_detection_utils import initialize_model, parse_detection_result
 
 """
 Object Detection Test Module
 
-<<<<<<< Updated upstream
 This module implements real-time object detection using YOLOv8 model with support for both
 webcam and video file inputs. It includes custom class filtering and visualization features.
 
@@ -22,10 +21,6 @@ USE_WEBCAM = False  # Toggle between webcam (True) and video file (False) input
 
 # File paths and model configuration
 video_path = '/Users/fredmac/Documents/DTU-FredMac/Drone/archive/Berghouse.mp4'
-=======
-# Paths to potential video files; only used if USE_WEBCAM=False
-video_path = 'software/src/videos/football.mp4'
->>>>>>> Stashed changes
 
 # Model and detection parameters
 model_name = "yolov8s.pt"

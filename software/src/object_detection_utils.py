@@ -1,5 +1,3 @@
-# object_detection_shared.py
-
 import torch
 from ultralytics import YOLO
 

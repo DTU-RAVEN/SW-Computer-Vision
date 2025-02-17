@@ -1,56 +1,34 @@
 import json
 import cv2
 import torch
-# ---------------- NEW IMPORT ----------------
-from object_detection_shared import initialize_model, parse_detection_result
-# --------------------------------------------
-# from ultralytics import YOLO  # Now handled by the helper script
-
+from object_detection_utils import initialize_model, parse_detection_result
 import rclpy                        
 from rclpy.node import Node        
 from sensor_msgs.msg import Image  
-from std_msgs.msg import String    
 from cv_bridge import CvBridge     
+
+# Import Detection2DArray and related messages from vision_msgs and geometry_msgs
+from vision_msgs.msg import Detection2D, ObjectHypothesisWithPose, BoundingBox2D, Detection2DArray
+from geometry_msgs.msg import Pose2D
+from std_msgs.msg import Header
 
 """
 Object Detection Node
 ====================
 This module implements a ROS2 node for real-time object detection using YOLOv8.
 It processes incoming camera frames, performs object detection, tracks objects
-across frames, and publishes detection results as JSON messages.
-
-Key Features:
-- Real-time object detection using YOLOv8
-- Simple object tracking with temporal smoothing
-- Configurable detection parameters
-- Support for multiple compute devices (CPU, CUDA, MPS)
-- Custom label mapping for specific use cases
+across frames, and publishes detection results as a Detection2DArray message.
 """
 
 # ---------------------------
 # HYPERPARAMETERS
 # ---------------------------
-"""
-Detection and Tracking Configuration:
-- model_name: YOLOv8 model variant to use
-- conf_threshold: Minimum confidence score for valid detections
-- iou_threshold: Intersection over Union threshold for NMS
-- MAX_MISSES: Number of frames an object can be missing before track is deleted
-- ALPHA: Exponential smoothing factor for bounding box positions
-"""
 model_name = "yolov8s.pt"
-conf_threshold = 0.1  # minimum confidence for detection
-iou_threshold = 0.50  # removes redundant boxes
-MAX_MISSES = 1  # how many frames to keep track of a missing object
-ALPHA = 1  # smoothing factor (how much to blend with previous frame. 1 = no smoothing)
+conf_threshold = 0.1
+iou_threshold = 0.50
+MAX_MISSES = 1
+ALPHA = 1
 
-"""
-Target Classes Configuration:
-- TARGET_CLASS_IDS: Set of COCO class IDs to detect
-- CUSTOM_LABELS: Mapping of class IDs to custom display labels
-These configurations filter detections to specific objects of interest
-and provide domain-specific labels for the application context.
-"""
 TARGET_CLASS_IDS = {
     0,   # person 
     2,   # car
@@ -92,40 +70,27 @@ class ObjectDetectionNode(Node):
     ROS2 Node for Object Detection and Tracking
     
     This node subscribes to camera images, performs object detection,
-    implements basic object tracking, and publishes detection results.
-    It uses YOLOv8 for detection and includes temporal smoothing for
-    stable tracking.
-
-    Publishers:
-    - /vision/object_spotted: JSON formatted detection results
-
-    Subscribers:
-    - /camera/image: Raw camera images
+    implements basic object tracking, and publishes detection results as
+    a Detection2DArray message.
     """
     def __init__(self) -> None:
-        """
-        Initialize the detection node, setting up:
-        - ROS2 publishers and subscribers
-        - YOLO model with appropriate compute device
-        - Tracking state management
-        """
         super().__init__('object_detection_node')
 
         self.subscription = self.create_subscription(
-            Image,            # Message type: The type of message to subscribe to (sensor_msgs/Image)
-            '/camera/image',  # Topic name: The ROS topic to listen to
-            self.listener_callback,  # Callback: Function called when message is received
-            10               # Queue size: How many messages to buffer if processing falls behind
+            Image,            # Subscribe to sensor_msgs/Image messages
+            '/camera/image',  # Topic name
+            self.listener_callback,  # Callback function
+            10               # QoS history depth
         )
 
-        
-        self.publisher_ = self.create_publisher(String, '/vision/object_spotted', 10)
+        # Publisher now uses Detection2DArray message type
+        self.publisher_ = self.create_publisher(Detection2DArray, '/vision/object_spotted', 10)
         self.bridge = CvBridge()
 
-        ## Initialize next track id as 0
+        # Initialize tracking state
         self.next_track_id = 0
 
-        # Decide on device
+        # Decide on compute device
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
             self.get_logger().info("Using Apple MPS device.")
@@ -136,29 +101,17 @@ class ObjectDetectionNode(Node):
             self.device = torch.device("cpu")
             self.get_logger().info("Using CPU device.")
 
-        # -------------- IMPORTANT CHANGE: Use our helper to load the YOLO model --------------
         self.model = initialize_model(model_name, self.device)
-
         self.get_logger().info("Object Detection Node started. Subscribed to /camera/image.")
 
-        # For tracking
+        # For object tracking
         self.track_history = {}
 
     def listener_callback(self, ros_image):
         """
-        Process incoming camera frames for object detection and tracking.
-        
-        Workflow:
-        1. Convert ROS image to OpenCV format
-        2. Run YOLOv8 detection
-        3. Process and filter detections
-        4. Update object tracking
-        5. Publish results as JSON
-        
-        Args:
-            ros_image: ROS sensor_msgs/Image message
+        Process incoming camera frames for object detection and tracking,
+        then publish all detections as a single Detection2DArray message.
         """
-        # Convert ROS Image to OpenCV (BGR)
         try:
             frame = self.bridge.imgmsg_to_cv2(ros_image, desired_encoding='bgr8')
         except Exception as e:
@@ -168,10 +121,10 @@ class ObjectDetectionNode(Node):
         stamp = ros_image.header.stamp.sec + ros_image.header.stamp.nanosec * 1e-9
         timestamp_ms = int(stamp * 1000)
 
-        # Convert BGR -> RGB for YOLO
+        # Convert image from BGR to RGB for YOLO
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Run detection
+        # Run detection using the YOLO model
         results = self.model.predict(
             rgb_frame,
             device=self.device,
@@ -179,31 +132,21 @@ class ObjectDetectionNode(Node):
             iou=iou_threshold,
             verbose=False
         )
-        
-        # ---------------------------------------------
-        # IMPORTANT CHANGE: Use parse_detection_result
-        # ---------------------------------------------
-        # results[0] is the YOLO result for this single frame
+
+        # Parse detections using the provided helper
         raw_detections = parse_detection_result(
             results[0], TARGET_CLASS_IDS, CUSTOM_LABELS, self.model
         )
-        # raw_detections is a list of (class_id, conf, x1, y1, x2, y2, display_label).
+        # raw_detections: list of (class_id, conf, x1, y1, x2, y2, display_label)
 
-        """
-        Tracking Logic:
-        - Maintains object persistence across frames
-        - Applies temporal smoothing to bounding boxes
-        - Handles track creation, updating, and deletion
-        - Manages track IDs for consistent object identification
-        """
-        # Tracking logic
+        # ---------------------
+        # Tracking Logic
+        # ---------------------
         current_detections = []
-
         for (class_id, conf, x1, y1, x2, y2, display_label) in raw_detections:
-            # Assign track ID (simple or more advanced)
             track_id = self.assign_track_id(x1, y1, x2, y2)
 
-            # Smoothing if existing track
+            # Apply smoothing if the track already exists
             if track_id in self.track_history:
                 old_x1, old_y1, old_x2, old_y2 = self.track_history[track_id]["bbox"]
                 x1 = int(ALPHA * x1 + (1 - ALPHA) * old_x1)
@@ -217,66 +160,59 @@ class ObjectDetectionNode(Node):
                 "label": display_label,
                 "miss_count": 0
             }
-
             current_detections.append(track_id)
 
-        # Increase miss_count for undetected in this frame
+        # Increase miss_count for tracks not detected in the current frame
         for t_id in list(self.track_history.keys()):
             if t_id not in current_detections:
                 self.track_history[t_id]["miss_count"] += 1
                 if self.track_history[t_id]["miss_count"] > MAX_MISSES:
                     del self.track_history[t_id]
 
-        """
-        Results Processing and Publishing:
-        - Formats detection results as JSON
-        - Includes object position, size, label, and confidence
-        - Adds temporal information (timestamp)
-        - Publishes formatted message for downstream processing
-        """
-        # Prepare JSON results
-        results_to_publish = []
+        # ---------------------
+        # Build and Publish Detection2DArray message
+        # ---------------------
+        detection_array_msg = Detection2DArray()
+        # Use the original image header for timestamp and frame_id
+        detection_array_msg.header = ros_image.header
+
         for t_id, info in self.track_history.items():
             if info["miss_count"] <= MAX_MISSES:
                 x1, y1, x2, y2 = info["bbox"]
                 conf = info["conf"]
                 label = info["label"]
 
-                cx = (x1 + x2) // 2
-                cy = (y1 + y2) // 2
+                # Compute bounding box center and size
+                cx = (x1 + x2) / 2.0
+                cy = (y1 + y2) / 2.0
                 width = x2 - x1
                 height = y2 - y1
 
-                detection_dict = {
-                    "object_id": t_id,
-                    "position": [cx, cy, width, height],
-                    "label": label,
-                    "confidence": conf,
-                    "timestamp": timestamp_ms,
-                }
-                results_to_publish.append(detection_dict)
+                detection_msg = Detection2D()
+                detection_msg.header = ros_image.header
 
-        msg = String()
-        msg.data = json.dumps({"detections": results_to_publish})
-        self.publisher_.publish(msg)
-        self.get_logger().info(f"Published {len(results_to_publish)} detections at t={timestamp_ms} ms.")
+                # Populate the bounding box
+                bbox = BoundingBox2D()
+                bbox.center = Pose2D(x=cx, y=cy, theta=0.0)
+                bbox.size_x = float(width)
+                bbox.size_y = float(height)
+                detection_msg.bbox = bbox
+
+                # Populate the hypothesis with detection result
+                hypothesis = ObjectHypothesisWithPose()
+                hypothesis.id = f"{t_id}:{label}"  # Combine track ID and label
+                hypothesis.score = conf            # Confidence score
+                detection_msg.results.append(hypothesis)
+
+                detection_array_msg.detections.append(detection_msg)
+
+        self.publisher_.publish(detection_array_msg)
+        self.get_logger().info(f"Published Detection2DArray with {len(detection_array_msg.detections)} detections at t={timestamp_ms} ms.")
 
     def assign_track_id(self, x1: int, y1: int, x2: int, y2: int) -> int:
         """
-        Associate current detection with existing tracks or create new track.
-        
-        Uses simple centroid-based tracking:
-        1. Calculates detection centroid
-        2. Compares with existing track centroids
-        3. Associates if within threshold distance
-        4. Creates new track if no match found
-        
-        Args:
-            x1, y1: Top-left corner coordinates of detection
-            x2, y2: Bottom-right corner coordinates of detection
-        
-        Returns:
-            int: Assigned track ID (either existing or new)
+        Associate the current detection with an existing track (using centroid distance)
+        or create a new track if no matching track is found.
         """
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
@@ -294,13 +230,7 @@ class ObjectDetectionNode(Node):
 
     def get_new_track_id(self) -> int:
         """
-        Generate unique tracking identifier.
-        
-        Implements simple incremental ID generation.
-        Thread-safe as ROS2 callbacks are single-threaded.
-        
-        Returns:
-            int: New unique track ID
+        Generate a unique tracking identifier.
         """
         if not hasattr(self, 'next_track_id'):
             self.next_track_id = 0
@@ -309,14 +239,6 @@ class ObjectDetectionNode(Node):
         return track_id
 
 def main(args=None) -> None:
-    """
-    Entry point for the object detection node.
-    
-    Handles:
-    - Node initialization
-    - Main event loop
-    - Graceful shutdown
-    """
     rclpy.init(args=args)
     node = ObjectDetectionNode()
     try:
