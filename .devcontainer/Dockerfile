@@ -62,6 +62,7 @@ RUN apt-get update
 RUN apt-get upgrade
 RUN apt-get install ros-foxy-ros-base python3-argcomplete -y
 RUN apt-get install ros-dev-tools -y
+RUN apt-get install ros-foxy-vision-msgs -y
 
 RUN groupadd -r -g 1001 raven \
     && useradd -rm -d /home/raven -s /bin/bash --uid 1001 --gid 1001 --groups sudo raven \
