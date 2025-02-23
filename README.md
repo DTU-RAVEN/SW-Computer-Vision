@@ -13,7 +13,7 @@ After cloning the repository, press `CTRL + SHIFT + B` and select `Setup Virtual
 To run the software, press `CTRL + SHIFT + B` and select `Run` in the drowdown menu.
 
 ## Folder structure
-
+.
 ├─ software/
 │  ├─ scripts/
 │  │  └─ (Shell scripts for setup, linting, and more)
