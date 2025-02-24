@@ -17,7 +17,7 @@ class VideoRecordingNode(Node):
         self.ts = message_filters.ApproximateTimeSynchronizer(
             [image_sub, detection_sub],
             queue_size=20,
-            slop=0.2  # allow up to 200ms difference between image and detection
+            slop=100  # allow up to x seconds difference between image and detection
         )
         self.ts.registerCallback(self.synced_callback)
 
@@ -28,7 +28,7 @@ class VideoRecordingNode(Node):
         self.frame_height = None
 
         self.start_time = time.time()
-        self.duration = 20.0   # Record for 20 seconds.
+        self.duration = 40.0   # Record for 20 seconds.
         self.VIDEO_FPS = 10.0  # Use camera's 10 Hz rate for both capture and playback.
 
     def synced_callback(self, image_msg, detection_msg):

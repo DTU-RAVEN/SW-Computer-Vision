@@ -95,7 +95,7 @@ class ObjectDetectionNode(Node):
             self.device = torch.device("mps")
             self.get_logger().info("Using Apple MPS device.")
         elif torch.cuda.is_available():
-            self.device = torch.device("cuda")
+            self.device = torch.device("cuda:0")
             self.get_logger().info("Using CUDA device.")
         else:
             self.device = torch.device("cpu")

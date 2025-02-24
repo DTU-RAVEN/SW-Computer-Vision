@@ -19,7 +19,7 @@ from cv_bridge import CvBridge
 import cv2
 
 # Configuration for video source
-USE_MP4_FILE = True  # Set to True to use run.mp4, False for live camera
+USE_MP4_FILE = False  # Set to True to use run.mp4, False for live camera
 video_path = "software/src/videos/football.mp4"
 
 class CameraNode(Node):
@@ -57,16 +57,20 @@ class CameraNode(Node):
 
         # Depending on the toggle, open the appropriate video source.
         if USE_MP4_FILE:
-            ## Video capture instance
+            # Use local MP4 file
             self.cap = cv2.VideoCapture(video_path)
             if not self.cap.isOpened():
-                self.get_logger().error("Could not open video file")
+                self.get_logger().error("Could not open video file.")
             else:
                 self.get_logger().info("Opened video file for video streaming.")
         else:
-            self.cap = cv2.VideoCapture(0)
+            # Use RTSP feed from IP camera
+            rtsp_url = "rtsp://192.168.145.25:8554/main.264"  # <-- Adjust this as needed
+            self.cap = cv2.VideoCapture(rtsp_url)
             if not self.cap.isOpened():
-                self.get_logger().error("Could not open camera.")
+                self.get_logger().error(f"Could not open RTSP stream at {rtsp_url}.")
+            else:
+                self.get_logger().info(f"Opened RTSP stream from {rtsp_url}.")
 
         ## CvBridge instance
         self.bridge = CvBridge()
