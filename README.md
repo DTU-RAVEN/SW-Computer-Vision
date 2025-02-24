@@ -11,3 +11,17 @@ After cloning the repository, press `CTRL + SHIFT + B` and select `Setup Virtual
 ## Run software
 
 To run the software, press `CTRL + SHIFT + B` and select `Run` in the drowdown menu.
+
+## Folder structure
+```txt
+├─ software/
+│  ├─ scripts/
+│  │  └─ (Shell scripts for setup, linting, and more)
+│  └─ src/
+│     ├─ application/
+│     ├─ config/
+│     ├─ videos/
+│     └─ (Python modules for camera, object detection, mapping, etc.)
+├─ README.md
+└─ requirements.txt
+```
