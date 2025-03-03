@@ -7,6 +7,8 @@ import cv2
 import time
 import message_filters
 
+CONTINUE_SAVING_TO_NEW_FILES = True
+
 class VideoRecordingNode(Node):
     def __init__(self):
         super().__init__('video_recording_node')
@@ -28,20 +30,29 @@ class VideoRecordingNode(Node):
         self.frame_height = None
 
         self.start_time = time.time()
-        self.duration = 40.0   # Record for 20 seconds.
+        self.duration = 40.0   # Record for 40 seconds.
         self.VIDEO_FPS = 10.0  # Use camera's 10 Hz rate for both capture and playback.
+        self.file_index = 1   # new file counter
 
     def synced_callback(self, image_msg, detection_msg):
         current_time = time.time()
-        # Stop recording if 20 seconds have passed.
-        if current_time - self.start_time > self.duration:
-            self.get_logger().info("Recording duration reached. Shutting down.")
-            if self.video_writer is not None:
+        # If a video is being recorded and its duration has elapsed...
+        if self.video_writer is not None and (current_time - self.start_time > self.duration):
+            if CONTINUE_SAVING_TO_NEW_FILES:
+                self.get_logger().info(f"Recording duration reached. Finishing file detections_{self.file_index}.mp4 and starting new file.")
                 self.video_writer.release()
                 self.get_logger().info("Released video writer.")
-            self.destroy_node()
-            rclpy.shutdown()
-            return
+                self.video_writer = None
+                self.file_index += 1
+                self.start_time = current_time
+            else:
+                self.get_logger().info("Recording duration reached. Shutting down.")
+                if self.video_writer is not None:
+                    self.video_writer.release()
+                    self.get_logger().info("Released video writer.")
+                self.destroy_node()
+                rclpy.shutdown()
+                return
 
         try:
             # Convert ROS Image to OpenCV BGR image.
@@ -85,14 +96,16 @@ class VideoRecordingNode(Node):
         # Initialize video writer if not already.
         if self.video_writer is None:
             self.frame_height, self.frame_width = annotated_frame.shape[:2]
+            # Use new filename if toggling is enabled.
+            filename = f"detections_{self.file_index}.mp4" if CONTINUE_SAVING_TO_NEW_FILES else "detections.mp4"
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            self.video_writer = cv2.VideoWriter('detections.mp4', fourcc,
+            self.video_writer = cv2.VideoWriter(filename, fourcc,
                                                 self.VIDEO_FPS,
                                                 (self.frame_width, self.frame_height))
             if not self.video_writer.isOpened():
                 self.get_logger().error("VideoWriter failed to open!")
             else:
-                self.get_logger().info("Video recording started: detections.mp4")
+                self.get_logger().info(f"Video recording started: {filename}")
                 
         self.video_writer.write(annotated_frame)
 
