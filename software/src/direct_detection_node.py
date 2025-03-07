@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Combined Detection Node
+Camera and Detection Node
 
 This node:
 - Opens a video source (either an RTSP stream or a local MP4 file).
