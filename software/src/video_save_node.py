@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+
+"""
+This script runs a ROS2 node that records video by synchronizing incoming camera images
+with detection data, overlaying detection bounding boxes, and saving the output to video files.
+"""
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image

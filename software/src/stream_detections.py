@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+
+"""
+This script runs a ROS2 node that subscribes to camera images and detection results.
+It overlays bounding boxes on the images and streams the annotated frames using Flask.
+"""
+
 import threading
 import cv2
 from flask import Flask, Response

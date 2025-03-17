@@ -30,9 +30,9 @@
             }
         },
         {
-            "label": "Run Object Detection Node",
+            "label": "Run Object Detection",
             "type": "shell",
-            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/SW-Computer-Vision && python3 software/src/object_detection_node.py", 
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/SW-Computer-Vision && python3 software/src/direct_detection_node.py", 
             "group": {
                 "kind": "build",
                 "isDefault": true
