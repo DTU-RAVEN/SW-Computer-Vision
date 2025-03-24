@@ -13,7 +13,8 @@ Configuration:
     - video_path: Path to the MP4 file (if USE_MP4_FILE is True).
     - rtsp_url: URL of the RTSP stream (if USE_MP4_FILE is False).
 """
-
+import torch.multiprocessing as mp
+mp.set_start_method('spawn', force=True)
 import sys
 import cv2
 import rclpy
@@ -30,8 +31,15 @@ from object_detection_utils import initialize_model, parse_detection_result
 # GLOBAL CONFIGURATION
 # ---------------------------
 USE_MP4_FILE = False  # Set to True to use video file input; False to use RTSP stream.
-video_path = "software/src/videos/football.mp4"
+video_path = "software/src/videos/categories/tennis racket.mov"
 rtsp_url = "rtsp://192.168.145.25:8554/main.264"  # Adjust as needed.
+rtsp_url = "rtsp://169.254.85.35:8899/stream1"  # Adjust as needed.
+
+PUBLISH_DETECTIONS = True  # Set to True to publish frames with detection overlays on '/vision/detection_frames'
+
+# Additional imports for publishing detection frames.
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
 # ---------------------------
 # DETECTION AND TRACKING PARAMETERS
@@ -62,31 +70,38 @@ TARGET_CLASS_IDS = {
 
 CUSTOM_LABELS = {
     0:  "Person / Mannequin",
-    2:  "Car (>1:8 Scale Model)",
-    3:  "Motorcycle (>1:8 Scale Model)",
-    4:  "Airplane (>3m Wing Span Scale Model)",
-    5:  "Bus (>1:8 Scale Model)",
-    8:  "Boat (>1:8 Scale Model)",
-    11: "Stop Sign (Flat, Upwards Facing)",
+    2:  "Car",
+    3:  "Motorcycle",
+    4:  "Airplane",
+    5:  "Bus",
+    8:  "Boat",
+    11: "Stop Sign",
     25: "Umbrella",
     28: "Suitcase",
     30: "Skis",
     31: "Snowboard",
-    32: "Sports Ball (Regulation Size)",
+    32: "Sports Ball",
     34: "Baseball Bat",
     38: "Tennis Racket",
-    59: "Bed / Mattress (> Twin Size)",
+    59: "Bed / Mattress",
 }
 
 class CombinedDetectionNode(Node):
     """
     A combined ROS2 node that performs both camera frame acquisition and object detection.
     """
-    def __init__(self):
+    def __init__(self, model):
         super().__init__('combined_detection_node')
+        self.model = model
 
         # Publisher for Detection2DArray messages.
         self.publisher_ = self.create_publisher(Detection2DArray, '/vision/object_spotted', 10)
+
+        # Optionally create publisher for detection frames.
+        if PUBLISH_DETECTIONS:
+            self.detection_frame_pub = self.create_publisher(Image, '/vision/detection_frames', 10)
+            self.bridge = CvBridge()
+            self.get_logger().info("Detection frame publisher initialized.")
 
         # Timer for periodic frame capture and processing (10Hz).
         timer_period = 0.1  # seconds
@@ -236,6 +251,24 @@ class CombinedDetectionNode(Node):
         self.publisher_.publish(detection_array_msg)
         self.get_logger().info(f"Published {len(detection_array_msg.detections)} detections.")
 
+        # Optionally publish the frame with detection overlays.
+        if PUBLISH_DETECTIONS:
+            # Copy frame to overlay detections.
+            detection_frame = frame.copy()
+            for t_id, info in self.track_history.items():
+                if info["miss_count"] <= MAX_MISSES:
+                    x1, y1, x2, y2 = info["bbox"]
+                    label = info["label"]
+                    conf = info["conf"]
+                    cv2.rectangle(detection_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(detection_frame, f"{label} {conf:.2f}", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            # Convert the detection frame to a ROS Image message.
+            img_msg = self.bridge.cv2_to_imgmsg(detection_frame, encoding="bgr8")
+            img_msg.header = header
+            self.detection_frame_pub.publish(img_msg)
+            self.get_logger().info("Published detection frame.")
+
     def assign_track_id(self, x1: int, y1: int, x2: int, y2: int) -> int:
         """
         Assign an existing track ID to a detection (using centroid distance) or
@@ -273,7 +306,11 @@ class CombinedDetectionNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CombinedDetectionNode()
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = initialize_model(model_name, device)
+    if not hasattr(model, 'device'):
+        model.device = device
+    node = CombinedDetectionNode(model)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

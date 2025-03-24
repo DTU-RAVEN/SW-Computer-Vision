@@ -4,7 +4,7 @@
         {
             "label": "Set Up Computer Vision",
             "type": "shell",
-            "command": "./software/scripts/computer_vision_setup.sh", //its like writing in console make //btw you can others commands like clean make build etc
+            "command": "./software/scripts/computer_vision_setup.sh && echo 'Set up Computer Vision successfully'", //its like writing in console make //btw you can others commands like clean make build etc
             "args": [],
             "group": {
                 "kind": "build",
@@ -32,16 +32,16 @@
         {
             "label": "Run Object Detection",
             "type": "shell",
-            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/SW-Computer-Vision && python3 software/src/direct_detection_node.py", 
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/SW-Computer-Vision && python3 software/src/direct_detection_node.py",
             "group": {
                 "kind": "build",
                 "isDefault": true
             }
         },
         {
-            "label": "Run Object Detection Visual",
+            "label": "Run Save Detection Visual",
             "type": "shell",
-            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/SW-Computer-Vision && python3 software/src/object_detection_test.py", 
+            "command": "source venv/bin/activate && cd .. && cd .. && source opt/ros/foxy/setup.bash && cd workspaces/SW-Computer-Vision && python3 software/src/save_detections.py",
             "group": {
                 "kind": "build",
                 "isDefault": true

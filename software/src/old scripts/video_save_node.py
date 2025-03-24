@@ -14,7 +14,7 @@ import cv2
 import time
 import message_filters
 
-CONTINUE_SAVING_TO_NEW_FILES = True
+CONTINUE_SAVING_TO_NE          W_FILES = True
 
 class VideoRecordingNode(Node):
     def __init__(self):
