@@ -35,7 +35,7 @@ video_path = "software/src/videos/categories/tennis racket.mov"
 rtsp_url = "rtsp://192.168.145.25:8554/main.264"  # Adjust as needed.
 rtsp_url = "rtsp://169.254.85.35:8899/stream1"  # Adjust as needed.
 
-PUBLISH_DETECTIONS = True  # Set to True to publish frames with detection overlays on '/vision/detection_frames'
+PUBLISH_FRAMES_WITH_DETECTIONS = True  # Set to True to publish frames with detection overlays on '/vision/detection_frames'
 
 # Additional imports for publishing detection frames.
 from sensor_msgs.msg import Image
@@ -98,7 +98,7 @@ class CombinedDetectionNode(Node):
         self.publisher_ = self.create_publisher(Detection2DArray, '/vision/object_spotted', 10)
 
         # Optionally create publisher for detection frames.
-        if PUBLISH_DETECTIONS:
+        if PUBLISH_FRAMES_WITH_DETECTIONS:
             self.detection_frame_pub = self.create_publisher(Image, '/vision/detection_frames', 10)
             self.bridge = CvBridge()
             self.get_logger().info("Detection frame publisher initialized.")
@@ -252,7 +252,7 @@ class CombinedDetectionNode(Node):
         self.get_logger().info(f"Published {len(detection_array_msg.detections)} detections.")
 
         # Optionally publish the frame with detection overlays.
-        if PUBLISH_DETECTIONS:
+        if PUBLISH_FRAMES_WITH_DETECTIONS:
             # Copy frame to overlay detections.
             detection_frame = frame.copy()
             for t_id, info in self.track_history.items():
