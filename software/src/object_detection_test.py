@@ -1,5 +1,11 @@
 import cv2
 import torch
+import gi
+import numpy as np
+import time
+
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
 from object_detection_utils import initialize_model, parse_detection_result
 
 """
@@ -17,7 +23,7 @@ Key Features:
 """
 
 # Configuration flags
-USE_WEBCAM = False  # Toggle between webcam (True) and video file (False) input
+USE_VIDEO_FILE = False  # True → play from video file; False → read live camera RTP stream
 
 # File paths and model configuration
 video_path = '/Users/fredmac/Documents/DTU-FredMac/Drone/archive/Berghouse.mp4'
@@ -128,55 +134,68 @@ def main():
     # Create a window for display
     cv2.namedWindow("Detections", cv2.WINDOW_NORMAL)
 
-    if USE_WEBCAM:
+    if not USE_VIDEO_FILE:
         """
-        Webcam Processing Loop
-        
-        Continuously captures frames from webcam, performs detection,
-        and displays results in real-time until ESC is pressed.
+        Camera Stream Processing (RTP H.264 over UDP)
+
+        Receives a live stream on UDP port 5000, decodes it with GStreamer,
+        and performs real‑time detection and visualization.
         """
-        print("Using webcam feed...")
-        cap = cv2.VideoCapture(0)  # 0 means default webcam; change if needed
+        print("Using live camera stream via GStreamer…")
 
-        if not cap.isOpened():
-            print("Error: Could not open webcam.")
-            return
+        # Build and start the GStreamer pipeline
+        Gst.init(None)
+        pipeline = Gst.parse_launch(
+            'udpsrc port=5000 caps="application/x-rtp,media=video,'
+            'clock-rate=90000,encoding-name=H264,payload=96" ! '
+            'rtpjitterbuffer ! rtph264depay ! decodebin ! videoconvert ! '
+            'video/x-raw,format=BGR ! appsink name=sink '
+            'emit-signals=true sync=false max-buffers=1 drop=true'
+        )
+        sink = pipeline.get_by_name("sink")
+        pipeline.set_state(Gst.State.PLAYING)
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("Failed to read from webcam. Exiting.")
-                break
+        try:
+            while True:
+                sample = sink.emit("try-pull-sample", 100_000_000)  # 100 ms
+                if sample is None:
+                    continue
 
-            # Run detection on the current frame
-            results = model.predict(
-                source=frame,
-                device=device,
-                conf=conf_threshold,
-                iou=iou_threshold
-            )
+                buf = sample.get_buffer()
+                caps = sample.get_caps()
+                width = caps.get_structure(0).get_value("width")
+                height = caps.get_structure(0).get_value("height")
 
-            # The result for a single image/frame is just results[0]
-            raw_detections = parse_detection_result(
-                results[0], TARGET_CLASS_IDS, CUSTOM_LABELS, model
-            )
+                ok, mapinfo = buf.map(Gst.MapFlags.READ)
+                if not ok:
+                    continue
+                frame = np.frombuffer(mapinfo.data, np.uint8).reshape((height, width, 3))
+                buf.unmap(mapinfo)
 
-            # Convert to the format (x1, y1, x2, y2, class_name, conf)
-            frame_detections = [
-                (x1, y1, x2, y2, label, conf)
-                for (class_id, conf, x1, y1, x2, y2, label) in raw_detections
-            ]
+                # Run YOLO v8 detection
+                results = model.predict(
+                    source=frame,
+                    device=device,
+                    conf=conf_threshold,
+                    iou=iou_threshold
+                )
+                raw_detections = parse_detection_result(
+                    results[0], TARGET_CLASS_IDS, CUSTOM_LABELS, model
+                )
+                frame_detections = [
+                    (x1, y1, x2, y2, label, conf)
+                    for (class_id, conf, x1, y1, x2, y2, label) in raw_detections
+                ]
 
-            # Draw detections and show
-            annotated_frame = draw_detections(frame, frame_detections)
-            cv2.imshow("Detections", annotated_frame)
+                annotated_frame = draw_detections(frame, frame_detections)
+                cv2.imshow("Detections", annotated_frame)
 
-            # Press ESC to quit
-            if cv2.waitKey(1) & 0xFF == 27:
-                break
-
-        cap.release()
-        cv2.destroyAllWindows()
+                # ESC to quit
+                if cv2.waitKey(1) & 0xFF == 27:
+                    break
+        finally:
+            pipeline.set_state(Gst.State.NULL)
+            cv2.destroyAllWindows()
 
     else:
         """

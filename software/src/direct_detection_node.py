@@ -32,14 +32,18 @@ from object_detection_utils import initialize_model, parse_detection_result
 # ---------------------------
 USE_MP4_FILE = False  # Set to True to use video file input; False to use RTSP stream.
 video_path = "software/src/videos/categories/tennis racket.mov"
-rtsp_url = "rtsp://192.168.145.25:8554/main.264"  # Adjust as needed.
-rtsp_url = "rtsp://169.254.85.35:8899/stream1"  # Adjust as needed.
+rtsp_url = "rtsp://192.168.153.1:8899/stream1"
 
 PUBLISH_FRAMES_WITH_DETECTIONS = True  # Set to True to publish frames with detection overlays on '/vision/detection_frames'
 
 # Additional imports for publishing detection frames.
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+import numpy as np
+import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
+Gst.init(None)
 
 # ---------------------------
 # DETECTION AND TRACKING PARAMETERS
@@ -115,11 +119,29 @@ class CombinedDetectionNode(Node):
             else:
                 self.get_logger().info("Opened video file for input.")
         else:
-            self.cap = cv2.VideoCapture(rtsp_url)
-            if not self.cap.isOpened():
-                self.get_logger().error(f"Could not open RTSP stream at {rtsp_url}.")
-            else:
-                self.get_logger().info(f"Opened RTSP stream from {rtsp_url}.")
+            # Build GStreamer pipeline for RTSP
+            pipeline_str = (
+                f"rtspsrc location={rtsp_url} "
+                "protocols=tcp latency=200 ! "
+                "rtpjitterbuffer latency=200 ! "
+                "rtph264depay ! "
+                "h264parse ! "
+                "avdec_h264 ! "
+                "videoconvert ! "
+                "video/x-raw,format=BGR ! "
+                "queue leaky=downstream max-size-buffers=1 ! "
+                "appsink name=sink "
+                "emit-signals=true sync=false drop=true"
+            )
+            try:
+                self.pipeline = Gst.parse_launch(pipeline_str)
+                self.sink = self.pipeline.get_by_name("sink")
+                self.pipeline.set_state(Gst.State.PLAYING)
+                self.get_logger().info(f"Opened RTSP stream from {rtsp_url} with GStreamer.")
+            except Exception as e:
+                self.get_logger().error(f"Failed to open RTSP stream: {e}")
+                self.pipeline = None
+                self.sink = None
 
         # Initialize object detection model.
         if torch.backends.mps.is_available():
@@ -146,17 +168,34 @@ class CombinedDetectionNode(Node):
         2. Performs object detection and tracking.
         3. Publishes the detection results.
         """
-        ret, frame = self.cap.read()
-
-        # If using video file, loop the video upon reaching its end.
-        if USE_MP4_FILE and not ret:
-            self.get_logger().warning("Reached end of video. Looping back to start.")
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        if USE_MP4_FILE:
             ret, frame = self.cap.read()
-
-        if not ret:
-            self.get_logger().warning("Failed to read frame from video source.")
-            return
+            # If using video file, loop the video upon reaching its end.
+            if not ret:
+                self.get_logger().warning("Reached end of video. Looping back to start.")
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self.cap.read()
+            if not ret:
+                self.get_logger().warning("Failed to read frame from video file.")
+                return
+        else:
+            if self.sink is None:
+                self.get_logger().warning("GStreamer sink not initialized.")
+                return
+            sample = self.sink.emit("try-pull-sample", 100_000_000)  # 100 ms
+            if sample is None:
+                self.get_logger().warning("No sample received from RTSP stream.")
+                return
+            buf = sample.get_buffer()
+            caps = sample.get_caps()
+            width = caps.get_structure(0).get_value("width")
+            height = caps.get_structure(0).get_value("height")
+            success, mapinfo = buf.map(Gst.MapFlags.READ)
+            if not success:
+                self.get_logger().warning("Failed to map GStreamer buffer.")
+                return
+            frame = np.frombuffer(mapinfo.data, np.uint8).reshape((height, width, 3))
+            buf.unmap(mapinfo)
 
         # Create a header for detection messages.
         header = Header()
@@ -302,6 +341,8 @@ class CombinedDetectionNode(Node):
         """
         if self.cap.isOpened():
             self.cap.release()
+        if hasattr(self, "pipeline") and self.pipeline:
+            self.pipeline.set_state(Gst.State.NULL)
         super().destroy_node()
 
 def main(args=None):

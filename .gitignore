@@ -6,3 +6,7 @@ software/src/application/.DS_Store
 /colmap_project
 /software/src/videos
 *.pyc
+/build
+*.0 rtph264depay
+/opencv
+/opencv_contrib
