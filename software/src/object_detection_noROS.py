@@ -6,7 +6,7 @@ import time
 
 gi.require_version('Gst', '1.0')
 from gi.repository import Gst
-from object_detection_utils import initialize_model, parse_detection_result
+from utils.object_detection_utils import initialize_model, parse_detection_result
 
 """
 Object Detection Test Module

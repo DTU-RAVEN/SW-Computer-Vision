@@ -25,7 +25,7 @@ from vision_msgs.msg import Detection2D, ObjectHypothesisWithPose, BoundingBox2D
 import torch
 
 # Import helper functions for model initialization and result parsing.
-from object_detection_utils import initialize_model, parse_detection_result
+from utils.object_detection_utils import initialize_model, parse_detection_result
 
 # ---------------------------
 # GLOBAL CONFIGURATION
