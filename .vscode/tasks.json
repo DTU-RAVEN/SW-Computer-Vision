@@ -1,6 +1,7 @@
 {
     "version": "2.0.0",
     "tasks": [
+
         {
             "label": "Set Up Computer Vision",
             "type": "shell",
@@ -11,15 +12,8 @@
                 "isDefault": true
             }
         },
-        {
-            "label": "Setup Virtual Environment",
-            "type": "shell",
-            "command": "./software/scripts/setup.sh", //its like writing in console make //btw you can others commands like clean make build etc
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        },
+
+
         {
             "label": "Run Camera Node",
             "type": "shell",
@@ -29,6 +23,8 @@
                 "isDefault": true
             }
         },
+
+
         {
             "label": "Run Object Detection",
             "type": "shell",
@@ -38,6 +34,8 @@
                 "isDefault": true
             }
         },
+
+
         {
             "label": "Run Save Detection Visual",
             "type": "shell",
@@ -47,6 +45,8 @@
                 "isDefault": true
             }
         },
+
+
         {
             "label": "Freeze Requirements",
             "type": "shell",
@@ -56,6 +56,8 @@
                 "isDefault": true
             }
         },
+
+
         {
             "label": "MyPy src",
             "type": "shell",
@@ -66,6 +68,8 @@
                 "isDefault": true
             }
         },
+
+
         {
             "label": "Pylint src",
             "type": "shell",
@@ -76,6 +80,8 @@
                 "isDefault": true
             }
         },
+
+
         {
             "label": "Generate Docs",
             "type": "shell",
@@ -86,5 +92,6 @@
                 "isDefault": true
             }
         }
+        
     ]
 }

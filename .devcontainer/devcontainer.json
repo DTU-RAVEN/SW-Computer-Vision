@@ -1,6 +1,20 @@
 {
-    "build": {
-        // Path is relative to the devcontainer.json file.
-        "dockerfile": "Dockerfile"
-    }
+  // Point VS Code at your Dockerfile
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  // After the container is created & your source is bind-mounted,
+  // create the venv (in the workspace folder) and install deps.
+  "postCreateCommand": "python3.8 -m venv venv && ./venv/bin/pip install --upgrade pip && ./venv/bin/pip install -r requirements.txt",
+
+  // Prepend the venv’s bin/ so that every terminal session
+  // sees python, pip, etc. from the venv by default.
+  "remoteEnv": {
+    "PATH": "/workspaces/SW-Computer-Vision/venv/bin:${containerEnv:PATH}"
+  },
+
+  // Set the folder where your code lives inside the container
+  "workspaceFolder": "/workspaces/SW-Computer-Vision"
 }
